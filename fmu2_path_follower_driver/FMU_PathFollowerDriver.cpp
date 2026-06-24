@@ -22,6 +22,10 @@
 #include <cassert>
 #include <algorithm>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
 #include "chrono/geometry/ChLineBezier.h"
 #include "chrono/utils/ChUtils.h"
@@ -71,34 +75,28 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     out_path = ".";
     save_img = false;
     fps = 60;
+    m_visible = visible;
+    fmu_visible = false;
 
-    look_ahead_dist = 5.0;
-    steering_type = 0;
-    Kp_steering = 0.8;
+    look_ahead_dist = 6.0;
+    steering_type = 1; // Default to Stanley
+    Kp_steering = 1.0;
     Ki_steering = 0.0;
     Kd_steering = 0.0;
     stanley_dead_zone = 0.0;
     max_wheel_turn_angle = 0.523;
 
     throttle_threshold = 0.2;
-    Kp_speed = 0.4;
-    Ki_speed = 0.0;
+    Kp_speed = 0.5;
+    Ki_speed = 0.1;
     Kd_speed = 0.0;
 
     init_loc = VNULL;
     init_yaw = 0;
 
-    // Get default path file from FMU resources
-    auto resources_dir = std::string(fmuResourceLocation).erase(0, 8);
-    path_file = resources_dir + "/ISO_double_lane_change.txt";
-
-#ifdef CHRONO_IRRLICHT
-    if (visible)
-        vis_sys = chrono_types::make_shared<irrlicht::ChVisualSystemIrrlicht>();
-#else
-    if (visible)
-        std::cout << "The FMU was not built with run-time visualization support. Visualization disabled." << std::endl;
-#endif
+    // Get default path file (relative to FMU resources at runtime)
+    resources_dir = std::string(fmuResourceLocation).erase(0, 8);
+    path_file = "default_lane_change_path.txt";
 
     // Set FIXED PARAMETERS for this FMU
     //// TODO: units for gains
@@ -145,6 +143,9 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     AddFmuVariable(&step_size, "step_size", FmuVariable::Type::Real, "s", "integration step size",  //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
 
+    AddFmuVariable(&fmu_visible, "visible", FmuVariable::Type::Boolean, "1", "enable visualization window", //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
+
     // Set FIXED PARAMETERS for this FMU (I/O)
     AddFmuVariable(&out_path, "out_path", FmuVariable::Type::String, "1", "output directory",    //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);  //
@@ -186,10 +187,20 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 }
 
 void FmuComponent::CreateDriver() {
-    std::cout << "Create driver FMU" << std::endl;
-    std::cout << " Path file: " << path_file << std::endl;
+    // Resolve path_file relative to FMU resources directory if relative/not found
+    std::string resolved_path_file = path_file;
+    std::filesystem::path p_path(path_file);
+    if (p_path.is_relative()) {
+        resolved_path_file = (std::filesystem::path(resources_dir) / p_path).string();
+    }
+    if (!std::filesystem::exists(resolved_path_file)) {
+        resolved_path_file = (std::filesystem::path(resources_dir) / "default_lane_change_path.txt").string();
+    }
 
-    auto path = ChBezierCurve::Read(path_file, false);
+    std::cout << "Create driver FMU" << std::endl;
+    std::cout << " Path file: " << resolved_path_file << std::endl;
+
+    auto path = ChBezierCurve::Read(resolved_path_file, false);
 
     speedPID = chrono_types::make_shared<ChSpeedController>();
     speedPID->SetGains(Kp_speed, Ki_speed, Kd_speed);
@@ -243,7 +254,42 @@ void FmuComponent::CalculateDriverOutputs() {
 
 void FmuComponent::preModelDescriptionExport() {}
 
-void FmuComponent::postModelDescriptionExport() {}
+void FmuComponent::postModelDescriptionExport() {
+    std::string filename = "modelDescription.xml";
+    std::ifstream infile(filename);
+    if (!infile.good()) {
+        std::cout << "[FMU postModelDescriptionExport] Warning: " << filename << " not found in current directory." << std::endl;
+        return;
+    }
+    std::stringstream buffer;
+    buffer << infile.rdbuf();
+    infile.close();
+
+    std::string content = buffer.str();
+    size_t pos = content.find("<fmiModelDescription");
+    if (pos == std::string::npos) {
+        std::cout << "[FMU postModelDescriptionExport] Warning: '<fmiModelDescription' tag not found." << std::endl;
+        return;
+    }
+
+    // Find the end of the opening tag
+    size_t end_tag_pos = content.find(">", pos);
+    if (end_tag_pos == std::string::npos) {
+        return;
+    }
+
+    // Check if description attribute already exists
+    if (content.find("description=", pos) == std::string::npos || content.find("description=", pos) > end_tag_pos) {
+        // Insert the description attribute right after "<fmiModelDescription"
+        std::string insertion = " description=\"Repository: https://github.com/kaanureyen/chrono_fmu\"";
+        content.insert(pos + 20, insertion);
+
+        std::ofstream outfile(filename);
+        outfile << content;
+        outfile.close();
+        std::cout << "[FMU postModelDescriptionExport] Injected description into " << filename << std::endl;
+    }
+}
 
 fmi2Status FmuComponent::enterInitializationModeIMPL() {
     return fmi2Status::fmi2OK;
@@ -255,6 +301,11 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
 
     // Initialize runtime visualization (if requested and if available)
 #ifdef CHRONO_IRRLICHT
+    if (m_visible || fmu_visible) {
+        if (!vis_sys) {
+            vis_sys = chrono_types::make_shared<irrlicht::ChVisualSystemIrrlicht>();
+        }
+    }
     if (vis_sys) {
         std::cout << " Enable run-time visualization" << std::endl;
 

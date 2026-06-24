@@ -12,5 +12,7 @@ bin/
 *.log
 *.fmu
 !fmus/*.fmu
-tmp_unpack_vehicle_4torques/
+tmp_unpack*/
 DEMO_OUTPUT/
+*.dll
+*.csv

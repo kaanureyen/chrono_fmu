@@ -89,6 +89,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     std::shared_ptr<chrono::vehicle::ChSpeedController> speedPID;            ///< speed controller
 
     std::string path_file;   ///< name of file with path Bezier curve data
+    std::string resources_dir; ///< path to extracted FMU resources
     int steering_type;       ///< steering controller type (0: PID, 1: Stanley)
     double look_ahead_dist;  ///< look ahead distance for lateral PID controller
     double Kp_steering;      ///< steering PID proportional gain
@@ -114,6 +115,8 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     std::string out_path;  ///< output directory
     fmi2Boolean save_img;         ///< enable/disable saving of visualization snapshots
     double fps;            ///< snapshot saving frequency (in FPS)
+    fmi2Boolean m_visible;        ///< visual window setting from instantiation
+    fmi2Boolean fmu_visible;      ///< visual window setting from parameter
 
     // Vehicle driver commands (FMU continuous outputs)
     double steering;  ///< steering command, in [-1,1]

@@ -24,6 +24,9 @@
 #include <algorithm>
 #include <iomanip>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
 #include "chrono/physics/ChContactMaterialSMC.h"
 #include "chrono/physics/ChContactMaterialNSC.h"
@@ -73,6 +76,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     driver_inputs = {0, 0, 0, 0};
     init_loc = {0, 0, 0};
     init_yaw = 0;
+    init_vel = 22.2222; // Default to 80 kph (22.2222 m/s)
 
     torque_FL = 0;
     torque_FR = 0;
@@ -92,17 +96,17 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     out_path = ".";
     save_img = false;
     fps = 60;
+    m_visible = visible;
+    fmu_visible = false;
 
-    // Get default JSON files from the FMU resources directory
+    // Get default JSON files (relative to FMU resources at runtime)
     resources_dir = std::string(fmuResourceLocation).erase(0, 8);
-    data_path = resources_dir + "/";
-    vehicle::SetVehicleDataPath(data_path);
-    chrono::SetChronoDataPath(data_path);
-    vehicle_JSON = resources_dir + "/Vehicle.json";
-    tire_JSON = resources_dir + "/vehicle/sedan/tire/Sedan_Pac02Tire.json";
-    terrain_type = 0;
+    data_path = "";
+    vehicle_JSON = "Vehicle.json";
+    tire_JSON = "vehicle/sedan/tire/Sedan_Pac02Tire.json";
+    terrain_type = 2; // Default to OpenCRG
     terrain_mesh_file = "";
-    terrain_crg_file = "";
+    terrain_crg_file = "default_road.crg";
     terrain_friction = 0.8;
 
     // Set wheel identifier strings
@@ -110,14 +114,6 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     wheel_data[1].identifier = "FR";
     wheel_data[2].identifier = "RL";
     wheel_data[3].identifier = "RR";
-
-#ifdef CHRONO_IRRLICHT
-    if (visible)
-        vis_sys = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
-#else
-    if (visible)
-        std::cout << "The FMU was not built with run-time visualization support. Visualization disabled." << std::endl;
-#endif
 
     // Set FIXED PARAMETERS for this FMU
     AddFmuVariable(&data_path, "data_path", FmuVariable::Type::String, "1", "vehicle data path",  //
@@ -153,6 +149,12 @@ FmuComponent::FmuComponent(fmi2String instanceName,
                       FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);  //
 
     AddFmuVariable(&step_size, "step_size", FmuVariable::Type::Real, "s", "integration step size",  //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
+
+    AddFmuVariable(&init_vel, "init_vel", FmuVariable::Type::Real, "m/s", "initial velocity",       //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
+
+    AddFmuVariable(&fmu_visible, "visible", FmuVariable::Type::Boolean, "1", "enable visualization window", //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
 
     // Set FIXED PARAMETERS for this FMU (I/O)
@@ -269,8 +271,8 @@ void FmuComponent::CreateVehicle() {
     // Resolve vehicle_JSON relative to the resources directory if relative/not found
     std::string resolved_vehicle_JSON = vehicle_JSON;
     std::filesystem::path p_vehicle(vehicle_JSON);
-    if (p_vehicle.is_relative() || !std::filesystem::exists(p_vehicle)) {
-        resolved_vehicle_JSON = (std::filesystem::path(data_path) / p_vehicle.filename()).string();
+    if (p_vehicle.is_relative()) {
+        resolved_vehicle_JSON = (std::filesystem::path(data_path) / p_vehicle).string();
     }
     if (!std::filesystem::exists(resolved_vehicle_JSON)) {
         resolved_vehicle_JSON = (std::filesystem::path(data_path) / "Vehicle.json").string();
@@ -281,6 +283,7 @@ void FmuComponent::CreateVehicle() {
     std::cout << " Vehicle JSON:      " << resolved_vehicle_JSON << std::endl;
     std::cout << " Initial location:  " << init_loc << std::endl;
     std::cout << " Initial yaw:       " << init_yaw << std::endl;
+    std::cout << " Initial velocity:  " << init_vel << std::endl;
 
     std::cout << "[FMU] Current working directory: " << std::filesystem::current_path().string() << std::endl;
     std::cout << "[FMU] Vehicle JSON file status: " << (std::filesystem::exists(resolved_vehicle_JSON) ? "FOUND" : "NOT FOUND") << std::endl;
@@ -289,7 +292,7 @@ void FmuComponent::CreateVehicle() {
     // Create the vehicle system
     vehicle = chrono_types::make_shared<WheeledVehicle>(resolved_vehicle_JSON, system_SMC ? ChContactMethod::SMC : ChContactMethod::NSC);
     std::cout << "[DEBUG] Vehicle created. Initializing..." << std::endl;
-    vehicle->Initialize(ChCoordsys<>(init_loc + ChVector3d(0, 0, 0.5), QuatFromAngleZ(init_yaw)));
+    vehicle->Initialize(ChCoordsys<>(init_loc + ChVector3d(0, 0, 0.5), QuatFromAngleZ(init_yaw)), init_vel);
     std::cout << "[DEBUG] Vehicle initialized." << std::endl;
 
     // Initialize the vehicle reference frame
@@ -309,8 +312,8 @@ void FmuComponent::CreateVehicle() {
     if (terrain_type == 1 && !terrain_mesh_file.empty()) {
         std::string resolved_mesh_file = terrain_mesh_file;
         std::filesystem::path p(terrain_mesh_file);
-        if (p.is_relative() || !std::filesystem::exists(p)) {
-            resolved_mesh_file = (std::filesystem::path(data_path) / p.filename()).string();
+        if (p.is_relative()) {
+            resolved_mesh_file = (std::filesystem::path(data_path) / p).string();
         }
         std::cout << "[FMU] Attempting to read terrain mesh file (absolute): " << std::filesystem::absolute(resolved_mesh_file).string() << std::endl;
         std::cout << "[FMU] Terrain mesh file status: " << (std::filesystem::exists(resolved_mesh_file) ? "FOUND" : "NOT FOUND") << std::endl;
@@ -334,8 +337,8 @@ void FmuComponent::CreateVehicle() {
     else if (terrain_type == 2 && !terrain_crg_file.empty()) {
         std::string resolved_crg_file = terrain_crg_file;
         std::filesystem::path p(terrain_crg_file);
-        if (p.is_relative() || !std::filesystem::exists(p)) {
-            resolved_crg_file = (std::filesystem::path(data_path) / p.filename()).string();
+        if (p.is_relative()) {
+            resolved_crg_file = (std::filesystem::path(data_path) / p).string();
         }
         std::cout << "[FMU] Attempting to read terrain CRG file (absolute): " << std::filesystem::absolute(resolved_crg_file).string() << std::endl;
         std::cout << "[FMU] Terrain CRG file status: " << (std::filesystem::exists(resolved_crg_file) ? "FOUND" : "NOT FOUND") << std::endl;
@@ -360,11 +363,11 @@ void FmuComponent::CreateVehicle() {
     std::cout << "[DEBUG] Configuring tires..." << std::endl;
     std::string resolved_tire_JSON = tire_JSON;
     std::filesystem::path p_tire(tire_JSON);
-    if (p_tire.is_relative() || !std::filesystem::exists(p_tire)) {
-        resolved_tire_JSON = (std::filesystem::path(data_path) / p_tire.relative_path()).string();
+    if (p_tire.is_relative()) {
+        resolved_tire_JSON = (std::filesystem::path(data_path) / p_tire).string();
     }
     if (!std::filesystem::exists(resolved_tire_JSON)) {
-        resolved_tire_JSON = (std::filesystem::path(data_path) / "vehicle/sedan/tire" / p_tire.filename()).string();
+        resolved_tire_JSON = (std::filesystem::path(data_path) / "vehicle/sedan/tire/Sedan_Pac02Tire.json").string();
     }
     std::cout << "[FMU] Attempting to read tire JSON file (absolute): " << std::filesystem::absolute(resolved_tire_JSON).string() << std::endl;
     std::cout << "[FMU] Tire JSON file status: " << (std::filesystem::exists(resolved_tire_JSON) ? "FOUND" : "NOT FOUND") << std::endl;
@@ -519,7 +522,42 @@ void FmuComponent::CalculateVehicleOutputs() {
 
 void FmuComponent::preModelDescriptionExport() {}
 
-void FmuComponent::postModelDescriptionExport() {}
+void FmuComponent::postModelDescriptionExport() {
+    std::string filename = "modelDescription.xml";
+    std::ifstream infile(filename);
+    if (!infile.good()) {
+        std::cout << "[FMU postModelDescriptionExport] Warning: " << filename << " not found in current directory." << std::endl;
+        return;
+    }
+    std::stringstream buffer;
+    buffer << infile.rdbuf();
+    infile.close();
+
+    std::string content = buffer.str();
+    size_t pos = content.find("<fmiModelDescription");
+    if (pos == std::string::npos) {
+        std::cout << "[FMU postModelDescriptionExport] Warning: '<fmiModelDescription' tag not found." << std::endl;
+        return;
+    }
+
+    // Find the end of the opening tag
+    size_t end_tag_pos = content.find(">", pos);
+    if (end_tag_pos == std::string::npos) {
+        return;
+    }
+
+    // Check if description attribute already exists
+    if (content.find("description=", pos) == std::string::npos || content.find("description=", pos) > end_tag_pos) {
+        // Insert the description attribute right after "<fmiModelDescription"
+        std::string insertion = " description=\"Repository: https://github.com/kaanureyen/chrono_fmu\"";
+        content.insert(pos + 20, insertion);
+
+        std::ofstream outfile(filename);
+        outfile << content;
+        outfile.close();
+        std::cout << "[FMU postModelDescriptionExport] Injected description into " << filename << std::endl;
+    }
+}
 
 fmi2Status FmuComponent::enterInitializationModeIMPL() {
     return fmi2Status::fmi2OK;
@@ -534,6 +572,11 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
 
     // Initialize runtime visualization (if requested and if available)
 #ifdef CHRONO_IRRLICHT
+    if (m_visible || fmu_visible) {
+        if (!vis_sys) {
+            vis_sys = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
+        }
+    }
     if (vis_sys) {
         std::cout << " Enable run-time visualization" << std::endl;
 

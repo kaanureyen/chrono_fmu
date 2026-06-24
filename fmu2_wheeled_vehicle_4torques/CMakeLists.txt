@@ -15,9 +15,9 @@ set(FMU_RESOURCES_DIRECTORY ${COMPONENT_RESOURCES_DIR})
 set(FMU_MSG_PREFIX "   - ")
 
 # Determine dependencies
-if(CH_ENABLE_MODULE_IRRLICHT AND Windows)
+if(CHRONO_IRRLICHT_FOUND AND WIN32)
   # Copy Irrlicht DLL if needed
-  set(FMU_DEPENDENCIES "${CH_IRRLICHT_DLL}")
+  set(FMU_DEPENDENCIES "${Irrlicht_DLL}")
 endif()
 
 FetchContent_Declare(

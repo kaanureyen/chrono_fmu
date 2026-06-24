@@ -117,6 +117,8 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     std::string out_path;  ///< output directory
     fmi2Boolean save_img;         ///< enable/disable saving of visualization snapshots
     double fps;            ///< snapshot saving frequency (in FPS)
+    fmi2Boolean m_visible;        ///< visual window setting from instantiation
+    fmi2Boolean fmu_visible;      ///< visual window setting from parameter
 
     // FMU parameters
     std::string data_path;                     ///< path to vehicle data
@@ -130,6 +132,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     fmi2Boolean system_SMC;                    ///< use SMC contact formulation (NSC otherwise)
     chrono::ChVector3d init_loc;               ///< initial vehicle location
     double init_yaw;                           ///< initial vehicle orientation
+    double init_vel;                           ///< initial vehicle forward velocity
     chrono::ChVector3d g_acc;                  ///< gravitational acceleration
     double step_size;                          ///< integration step size
 
