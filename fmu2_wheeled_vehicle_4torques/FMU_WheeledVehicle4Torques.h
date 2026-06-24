@@ -10,6 +10,7 @@
 //
 // =============================================================================
 // Authors: Radu Serban, Antigravity AI
+// Repository: https://github.com/kaanureyen/chrono_fmu
 // =============================================================================
 //
 // Co-simulation FMU encapsulating a wheeled vehicle system with 4 wheels.

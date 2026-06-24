@@ -10,6 +10,7 @@
 //
 // =============================================================================
 // Authors: Radu Serban
+// Repository: https://github.com/kaanureyen/chrono_fmu
 // =============================================================================
 //
 // Co-simulation FMU encapsulating a vehicle path-follower driver system.
