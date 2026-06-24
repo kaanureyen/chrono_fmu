@@ -1,0 +1,9 @@
+{
+  "_help_Name": "Descriptive name of the brake subsystem",
+  "Name": "Sedan Brake Front",
+  "Type": "Brake",
+  "Template": "BrakeSimple",
+
+  "_help_MaximumTorque": "Maximum braking torque in Nm applied at full brake input (1.0)",
+  "Maximum Torque": 2000
+}

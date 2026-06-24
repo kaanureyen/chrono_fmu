@@ -1,0 +1,28 @@
+{
+  "_help_Name": "Descriptive name of the tire model",
+  "Name": "Magic Formula Tire from ADAMS/Car TIR file",
+  "Type": "Tire",
+  "Template": "Pac02Tire",
+
+  "_help_Mass": "Mass of the tire in kg",
+  "Mass": 11.5,
+  "_help_Inertia": "Rotational moments of inertia of the tire: [Ixx, Iyy, Izz] in kg.m^2",
+  "Inertia": [
+    0.156,
+    0.679,
+    0.156
+  ],
+
+  "_help_TIRSpecificationFile": "Path to the Adams/Car .tir specification file containing Pacejka Magic Formula coefficients",
+  "TIR Specification File": "vehicle/sedan/tire/Sedan_Pac02Tire.tir",
+
+  "_help_CoefficientOfFriction": "Reference ground coefficient of friction scale factor",
+  "Coefficient of Friction": 0.8,
+
+  "_help_Visualization": "Mesh files for left and right tire rendering and tire visual width",
+  "Visualization": {
+    "Mesh Filename Left": "vehicle/sedan/sedan_tire.obj",
+    "Mesh Filename Right": "vehicle/sedan/sedan_tire.obj",
+    "Width": 0.245
+  }
+}

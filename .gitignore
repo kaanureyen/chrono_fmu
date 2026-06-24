@@ -1,0 +1,15 @@
+# CMake and Visual Studio build directories
+build/
+.vs/
+out/
+bin/
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.filters
+*.dir
+*.log
+*.fmu
+tmp_unpack_vehicle_4torques/
+DEMO_OUTPUT/

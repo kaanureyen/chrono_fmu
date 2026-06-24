@@ -1,0 +1,61 @@
+{
+  "_help_Name": "Descriptive name of the vehicle assembly",
+  "Name": "Sedan Vehicle",
+  "Type": "Vehicle",
+  "Template": "WheeledVehicle",
+
+  "_help_Chassis": "Rigid chassis input file and optional output setting",
+  "Chassis": {
+    "Input File": "Chassis.json",
+    "Output": false
+  },
+
+  "_help_RearChassis_Optional": "Optional articulated vehicle parts. Example: 'Rear Chassis': [ { 'Input File': 'RearChassis.json', 'Connector Input File': 'Connector.json', 'Chassis Index': 0, 'Output': false } ]",
+  "_help_Subchassis_Optional": "Optional subchassis components. Example: 'Subchassis': [ { 'Input File': 'Subchassis.json', 'Subchassis Location': [0, 0, 0], 'Chassis Index': 0 } ]",
+
+  "_help_Axles": "List of vehicle axles containing suspension, steering index, left/right wheel, left/right brake files and coordinates",
+  "Axles": [
+    {
+      "Suspension Input File": "DoubleWishboneFront.json",
+      "Suspension Location": [ 1.388, 0, 0.25 ],
+      "Steering Index": 0,
+      "Left Wheel Input File": "Wheel.json",
+      "Right Wheel Input File": "Wheel.json",
+      "Left Brake Input File": "BrakeSimple_Front.json",
+      "Right Brake Input File": "BrakeSimple_Front.json",
+      "Output": false,
+      "_help_Axle_Optional": "Optional: 'Chassis Index' (int), 'Subchassis Index' (int), 'Antirollbar Input File' (string), 'Antirollbar Location' (vector3), 'Tire Input File' (string). Double wheel parameters: 'Wheel Separation' (double), 'Left Inside Wheel Input File', 'Right Inside Wheel Input File', 'Left Outside Wheel Input File', 'Right Outside Wheel Input File'."
+    },
+    {
+      "Suspension Input File": "DoubleWishboneRear.json",
+      "Suspension Location": [ -1.388, 0, 0.125 ],
+      "Left Wheel Input File": "Wheel.json",
+      "Right Wheel Input File": "Wheel.json",
+      "Left Brake Input File": "BrakeSimple_Rear.json",
+      "Right Brake Input File": "BrakeSimple_Rear.json",
+      "Output": false
+    }
+  ],
+
+  "_help_SteeringSubsystems": "List of steering mechanisms, coordinates and orientation quaternions",
+  "Steering Subsystems": [
+    {
+      "Input File": "RackPinion.json",
+      "Location": [ 1.2, 0, 0.14 ],
+      "Orientation": [ 1, 0, 0, 0 ],
+      "Output": false
+    }
+  ],
+
+  "_help_Limits": "Vehicle dimensional and steering deflection limits (wheelbase and turning radius are optional, estimated if omitted)",
+  "Wheelbase": 2.776,
+  "Minimum Turning Radius": 7.6,
+  "Maximum Steering Angle (deg)": 25.0,
+
+  "_help_Driveline": "Driveline model input file and index of driven suspension axles (e.g. index 1 represents the rear axle)",
+  "Driveline": {
+    "Input File": "Driveline2WD.json",
+    "Suspension Indexes": [ 1 ],
+    "Output": false
+  }
+}

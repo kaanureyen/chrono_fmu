@@ -1,0 +1,36 @@
+{
+  "_help_Name": "Descriptive name of the chassis subsystem",
+  "Name": "Sedan chassis",
+  "Type": "Chassis",
+  "Template": "RigidChassis",
+
+  "_help_Components": "Chassis rigid body components. Total mass/inertia are calculated as their composite properties.",
+  "Components": [
+    {
+      "Centroidal Frame": {
+        "Location": [0, 0, 0.7],
+        "Orientation": [1, 0, 0, 0]
+      },
+      "Mass": 1550,
+      "Moments of Inertia": [222.8, 944.1, 1053.5],
+      "Products of Inertia": [0, 0, 0],
+      "Void": false
+    }
+  ],
+
+  "_help_DriverPosition": "Driver's seat location and orientation relative to chassis origin",
+  "Driver Position": {
+    "Location": [1.0, 0.4, 1.2],
+    "Orientation": [1, 0, 0, 0]
+  },
+
+  "_help_RearConnectorLocation": "Mounting point coordinate for rear trailer connectors (optional)",
+  "Rear Connector Location": [-2.5, 0, -0.1],
+
+  "_help_Contact_Optional": "Optional: Define collision geometry. Example: 'Contact': { 'Materials': [ { 'Coefficient of Friction': 0.8, 'Coefficient of Restitution': 0.1 } ], 'Shapes': [ { 'Type': 'BOX', 'Material Index': 0, 'Location': [0, 0, 0.5], 'Orientation': [1, 0, 0, 0], 'Dimensions': [3.0, 1.5, 1.0] } ] }",
+
+  "_help_Visualization": "Mesh or geometric primitives for chassis rendering",
+  "Visualization": {
+    "Mesh": "vehicle/sedan/sedan_chassis_vis.obj"
+  }
+}

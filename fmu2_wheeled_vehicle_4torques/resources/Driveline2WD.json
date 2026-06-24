@@ -1,0 +1,26 @@
+{
+  "_help_Name": "Descriptive name of the driveline subsystem",
+  "Name": "RWD Driveline",
+  "Type": "Driveline",
+  "Template": "ShaftsDriveline2WD",
+
+  "_help_ShaftDirection": "Direction vectors for the motor block and output axles",
+  "Shaft Direction": {
+    "Motor Block": [ 1, 0, 0 ],
+    "Axle": [ 0, 1, 0 ]
+  },
+
+  "_help_ShaftInertia": "Rotational shaft inertia values in kg.m^2",
+  "Shaft Inertia": {
+    "Driveshaft": 0.5,
+    "Differential Box": 0.6
+  },
+
+  "_help_GearRatio": "Conical gear (ring and pinion bevel gear) differential ratio",
+  "Gear Ratio": {
+    "Conical Gear": 0.2
+  },
+
+  "_help_AxleDifferentialLockingLimit": "Locking torque bias limit for limited slip differential (optional)",
+  "Axle Differential Locking Limit": 100
+}

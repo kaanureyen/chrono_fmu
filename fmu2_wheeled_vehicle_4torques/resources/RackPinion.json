@@ -1,0 +1,21 @@
+{
+  "_help_Name": "Descriptive name of the steering subsystem",
+  "Name": "Sedan Rack-Pinion Steering",
+  "Type": "Steering",
+  "Template": "RackPinion",
+
+  "_help_SteeringLink": "Properties of the sliding rack/steering link body",
+  "Steering Link": {
+    "Mass": 1.889,
+    "COM": 0,
+    "Inertia": [0.138, 0.00009, 0.138],
+    "Radius": 0.03,
+    "Length": 0.5
+  },
+
+  "_help_Pinion": "Pinion gear parameters. Radius determines rack displacement per steering angle. Maximum Angle is steering rotational limit.",
+  "Pinion": {
+    "Radius": 0.3,
+    "Maximum Angle (deg)": 15.5
+  }
+}

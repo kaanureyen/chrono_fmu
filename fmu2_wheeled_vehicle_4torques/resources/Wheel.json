@@ -1,0 +1,18 @@
+{
+  "_help_Name": "Descriptive name of the wheel subsystem",
+  "Name": "Sedan Wheel",
+  "Type": "Wheel",
+  "Template": "Wheel",
+
+  "_help_Mass": "Mass of the wheel in kg (excluding the tire)",
+  "Mass": 13.2,
+  "_help_Inertia": "Rotational inertia moments of the wheel: [Ixx, Iyy, Izz] in kg.m^2",
+  "Inertia": [ 0.24, 0.42, 0.24 ],
+
+  "_help_Visualization": "Mesh filename and dimensions for wheel rendering",
+  "Visualization": {
+    "Mesh Filename": "vehicle/sedan/sedan_rim.obj",
+    "Radius": 0.2286,
+    "Width": 0.205
+  }
+}

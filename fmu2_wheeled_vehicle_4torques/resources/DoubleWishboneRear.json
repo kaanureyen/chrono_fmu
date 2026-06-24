@@ -1,0 +1,86 @@
+{
+  "_help_Name": "Descriptive name of the rear suspension",
+  "Name": "Sedan DoubleWishbone Rear",
+  "Type": "Suspension",
+  "Template": "DoubleWishbone",
+
+  "_help_VehicleFrameInertia": "If true, arm/upright moments of inertia are aligned with vehicle frame. Defaults to false.",
+  "Vehicle-Frame Inertia": false,
+
+  "_help_Angles": "Static camber and toe angles in degrees (optional)",
+  "Camber Angle (deg)": 0,
+  "Toe Angle (deg)": 0,
+
+  "_help_Spindle": "Spindle/hub properties (mass, COM coordinate, principal moments of inertia, dimensions)",
+  "Spindle": {
+    "Mass": 1.103,
+    "COM": [0, 0.7979, -0.1199],
+    "Inertia": [0.000478, 0.000496, 0.000478],
+    "Radius": 0.1,
+    "Width": 0.02
+  },
+
+  "_help_Upright": "Upright/knuckle properties connecting spindle to control arms",
+  "Upright": {
+    "Mass": 1.397,
+    "COM": [-0.0224, 0.7470, -0.1118],
+    "Moments of Inertia": [0.0138, 0.0146, 0.00283],
+    "Products of Inertia": [0, 0, 0],
+    "Radius": 0.025
+  },
+
+  "_help_UpperControlArm": "Upper control arm (UCA) properties, chassis mounting coordinates, and upright connection coordinate",
+  "Upper Control Arm": {
+    "Mass": 1.032,
+    "COM": [-0.1083, 0.5972, 0.1063],
+    "Moments of Inertia": [0.00591, 0.00190, 0.00769],
+    "Products of Inertia": [0, 0, 0],
+    "Radius": 0.02,
+    "Location Chassis Front": [-0.100, 0.4700, 0.1050],
+    "Location Chassis Back": [-0.250, 0.5100, 0.1100],
+    "Location Upright": [-0.040, 0.6950, 0.1050],
+    "_help_BushingData_Optional": "Optional bushing template: 'Bushing Data': { 'Stiffness Linear': 1e7, 'Damping Linear': 1e5, 'Stiffness Rotational': 1e5, 'Damping Rotational': 1e3 }"
+  },
+
+  "_help_LowerControlArm": "Lower control arm (LCA) properties, chassis mounting coordinates, and upright connection coordinate",
+  "Lower Control Arm": {
+    "Mass": 1.611,
+    "COM": [0.0048, 0.6112, -0.2932],
+    "Moments of Inertia": [0.0151, 0.0207, 0.0355],
+    "Products of Inertia": [0, 0, 0],
+    "Radius": 0.03,
+    "Location Chassis Front": [0.2, 0.4200, -0.2700],
+    "Location Chassis Back": [-0.2, 0.4700, -0.2650],
+    "Location Upright": [0.0, 0.7700, -0.3200],
+    "_help_BushingData_Optional": "Optional bushing template: same as Upper Control Arm"
+  },
+
+  "_help_Tierod": "Tie-rod connection joint locations on chassis and upright",
+  "Tierod": {
+    "Location Chassis": [-0.2, 0.4200, -0.1200],
+    "Location Upright": [-0.15, 0.7700, -0.1200],
+    "_help_Tierod_Optional": "Optional parameters to define tierod body: 'Mass' (double), 'Inertia' (vector3), 'Radius' (double), 'Bushing Data' (object)"
+  },
+
+  "_help_Spring": "Spring mounting coordinates, free (unloaded) length, and linear/nonlinear force characteristics",
+  "Spring": {
+    "Location Chassis": [-0.04, 0.5200, 0.2300],
+    "Location Arm": [0.0, 0.6200, -0.2700],
+    "Free Length": 0.51,
+    "Spring Coefficient": 500000.0,
+    "_help_Spring_Optional": "Optional parameters: 'Preload' (double), 'Minimum Length' (double), 'Maximum Length' (double) for travel stops. Or replace 'Spring Coefficient' with 'Spring Curve Data': [[displacement, force], ...] for lookup tables."
+  },
+
+  "_help_Shock": "Shock absorber mounting coordinates and linear/nonlinear damping characteristics",
+  "Shock": {
+    "Location Chassis": [-0.04, 0.5200, 0.2300],
+    "Location Arm": [0.0, 0.6200, -0.2700],
+    "Damping Coefficient": 10000.0,
+    "_help_Shock_Optional": "Optional parameters: 'Degressivity Compression' (double), 'Degressivity Expansion' (double). Or replace 'Damping Coefficient' with 'Damping Curve Data': [[velocity, force], ...] for lookup tables."
+  },
+
+  "_help_Axle": "Rotational inertia of the drive axle shaft",
+  "Axle": {
+    "Inertia": 0.4
+  }
+}
