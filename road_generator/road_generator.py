@@ -19,7 +19,7 @@ def generate_bezier_path():
     target_speed = 80.0 / 3.6  # 22.2222 m/s
     t_start = 2.0
     t_duration = 5.0
-    t_end = 10.0
+    t_end = 13.0
     dt = 0.25
     width = 5.0
     
@@ -62,7 +62,7 @@ def get_I(alpha):
 
 def generate_crg_road():
     # Grid definition (0.02m resolution)
-    u_length = 245.0
+    u_length = 300.0
     du = 0.02
     u_grid = np.arange(0.0, u_length + du/2, du)
     
@@ -77,9 +77,9 @@ def generate_crg_road():
     # 1. Path Heading and Reference Line Integration
     # Path equations
     target_speed = 80.0 / 3.6  # 22.2222 m/s
-    t_start = 0.5
+    t_start = 2.0
     t_duration = 5.0
-    t_end = 7.0  # long enough to cover 400m
+    t_end = 13.0  # long enough to cover 400m
     width = 5.0
     
     # Numerically integrate arc length u(t) along the path starting from t = -0.5s
