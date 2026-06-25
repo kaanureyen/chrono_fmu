@@ -17,9 +17,9 @@ os.makedirs(VEHICLE_RES_DIR, exist_ok=True)
 # -----------------------------------------------------------------------------
 def generate_bezier_path():
     target_speed = 80.0 / 3.6  # 22.2222 m/s
-    t_start = 0.5
+    t_start = 2.0
     t_duration = 5.0
-    t_end = 7.0
+    t_end = 10.0
     dt = 0.25
     width = 5.0
     
@@ -62,7 +62,7 @@ def get_I(alpha):
 
 def generate_crg_road():
     # Grid definition (0.02m resolution)
-    u_length = 175.0
+    u_length = 245.0
     du = 0.02
     u_grid = np.arange(0.0, u_length + du/2, du)
     
