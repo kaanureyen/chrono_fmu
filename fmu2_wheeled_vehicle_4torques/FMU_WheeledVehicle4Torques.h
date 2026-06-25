@@ -126,6 +126,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     std::string vehicle_JSON;                  ///< JSON vehicle specification file
     std::string tire_JSON;                     ///< JSON tire specification file
     int terrain_type;                          ///< terrain type (0: Flat, 1: Mesh OBJ, 2: OpenCRG)
+    int tire_coll_type;                        ///< tire collision type (0: single, 1: four points, 2: envelope)
     std::string terrain_mesh_file;             ///< OBJ road surface mesh file (for terrain_type = 1)
     std::string terrain_crg_file;              ///< OpenCRG road file (.crg) (for terrain_type = 2)
     double terrain_friction;                   ///< terrain coefficient of friction

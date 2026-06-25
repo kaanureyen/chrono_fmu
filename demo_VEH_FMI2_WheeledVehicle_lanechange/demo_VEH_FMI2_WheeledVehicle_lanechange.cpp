@@ -46,6 +46,8 @@ int main(int argc, char* argv[]) {
     double max_torque = 350.0;
     double init_vel = 22.2222; // 80 kph
     std::string out_file = "lane_change_trajectory.csv";
+    int tire_coll_type = 0;    // Default: 0 (Single-point contact)
+    double stop_time = 10.0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -67,6 +69,10 @@ int main(int argc, char* argv[]) {
             init_vel = std::stod(argv[++i]);
         } else if (arg == "--output" && i + 1 < argc) {
             out_file = argv[++i];
+        } else if (arg == "--tire_coll_type" && i + 1 < argc) {
+            tire_coll_type = std::stoi(argv[++i]);
+        } else if (arg == "--tend" && i + 1 < argc) {
+            stop_time = std::stod(argv[++i]);
         }
     }
 
@@ -79,6 +85,8 @@ int main(int argc, char* argv[]) {
     std::cout << "  max_torque:      " << max_torque << std::endl;
     std::cout << "  init_vel:        " << init_vel << std::endl;
     std::cout << "  out_file:        " << out_file << std::endl;
+    std::cout << "  tire_coll_type:  " << tire_coll_type << std::endl;
+    std::cout << "  stop_time:       " << stop_time << std::endl;
 
     std::string vehicle_fmu_filename = "FMU2cs_WheeledVehicle4Torques.fmu";
     std::string driver_fmu_filename = "FMU2cs_PathFollowerDriver.fmu";
@@ -151,7 +159,6 @@ int main(int argc, char* argv[]) {
     driver_fmu.SetDebugLogging(fmi2True, logCategories);
 
     double start_time = 0.0;
-    double stop_time = 10.0; // Lane change is 5 seconds long (starting at t=2), so 10s is plenty.
     double step_size = 1e-3;
 
     vehicle_fmu.SetupExperiment(fmi2False, 0.0, start_time, fmi2False, stop_time);
@@ -194,6 +201,7 @@ int main(int argc, char* argv[]) {
         vehicle_fmu.SetVariable("init_vel", init_vel, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("terrain_type", 2, FmuVariable::Type::Integer); // OpenCRG
         vehicle_fmu.SetVariable("terrain_crg_file", "default_road.crg");
+        vehicle_fmu.SetVariable("tire_coll_type", tire_coll_type, FmuVariable::Type::Integer);
         vehicle_fmu.SetVariable("step_size", step_size, FmuVariable::Type::Real);
 
         // Exit initialization mode for Vehicle
@@ -255,8 +263,38 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-        // 7. Write trajectory to CSV
-        csv << time << ref_frame.GetPos() << ref_frame.GetRot().GetCardanAnglesXYZ() << std::endl;
+        // Retrieve suspension velocities
+        double susp_vel_FL = 0, susp_vel_FR = 0, susp_vel_RL = 0, susp_vel_RR = 0;
+        vehicle_fmu.GetVariable("susp_FL.velocity", susp_vel_FL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_FR.velocity", susp_vel_FR, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_RL.velocity", susp_vel_RL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_RR.velocity", susp_vel_RR, FmuVariable::Type::Real);
+
+        // Retrieve tire forces
+        double tire_f_FL_x = 0, tire_f_FL_y = 0, tire_f_FL_z = 0;
+        double tire_f_FR_x = 0, tire_f_FR_y = 0, tire_f_FR_z = 0;
+        double tire_f_RL_x = 0, tire_f_RL_y = 0, tire_f_RL_z = 0;
+        double tire_f_RR_x = 0, tire_f_RR_y = 0, tire_f_RR_z = 0;
+        vehicle_fmu.GetVariable("wheel_FL.force.x", tire_f_FL_x, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FL.force.y", tire_f_FL_y, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FL.force.z", tire_f_FL_z, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.force.x", tire_f_FR_x, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.force.y", tire_f_FR_y, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.force.z", tire_f_FR_z, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.force.x", tire_f_RL_x, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.force.y", tire_f_RL_y, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.force.z", tire_f_RL_z, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.force.x", tire_f_RR_x, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.force.y", tire_f_RR_y, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.force.z", tire_f_RR_z, FmuVariable::Type::Real);
+
+        // 7. Write trajectory, suspension velocities, and tire forces to CSV
+        csv << time << ref_frame.GetPos() << ref_frame.GetRot().GetCardanAnglesXYZ()
+            << susp_vel_FL << susp_vel_FR << susp_vel_RL << susp_vel_RR
+            << tire_f_FL_x << tire_f_FL_y << tire_f_FL_z
+            << tire_f_FR_x << tire_f_FR_y << tire_f_FR_z
+            << tire_f_RL_x << tire_f_RL_y << tire_f_RL_z
+            << tire_f_RR_x << tire_f_RR_y << tire_f_RR_z << std::endl;
 
         time += step_size;
     }

@@ -17,9 +17,9 @@ os.makedirs(VEHICLE_RES_DIR, exist_ok=True)
 # -----------------------------------------------------------------------------
 def generate_bezier_path():
     target_speed = 80.0 / 3.6  # 22.2222 m/s
-    t_start = 2.0
+    t_start = 0.5
     t_duration = 5.0
-    t_end = 15.0
+    t_end = 7.0
     dt = 0.25
     width = 5.0
     
@@ -61,14 +61,14 @@ def get_I(alpha):
     return np.sum((1.0 + t**2)**(-alpha/2.0)) * dt
 
 def generate_crg_road():
-    # Grid definition (Nyquist compliant: spacing <= 0.25 m)
-    u_length = 400.0
-    du = 0.2
+    # Grid definition (0.02m resolution)
+    u_length = 175.0
+    du = 0.02
     u_grid = np.arange(0.0, u_length + du/2, du)
     
-    v_right = -6.0
-    v_left = 6.0
-    dv = 0.2
+    v_right = -2.0
+    v_left = 2.0
+    dv = 0.02
     v_grid = np.arange(v_right, v_left + dv/2, dv)
     
     Nu = len(u_grid)
@@ -77,14 +77,14 @@ def generate_crg_road():
     # 1. Path Heading and Reference Line Integration
     # Path equations
     target_speed = 80.0 / 3.6  # 22.2222 m/s
-    t_start = 2.0
+    t_start = 0.5
     t_duration = 5.0
-    t_end = 25.0  # long enough to cover 400m
+    t_end = 7.0  # long enough to cover 400m
     width = 5.0
     
-    # Numerically integrate arc length u(t) along the path
+    # Numerically integrate arc length u(t) along the path starting from t = -0.5s
     dt_int = 0.001
-    t_int = np.arange(0.0, t_end, dt_int)
+    t_int = np.arange(-0.5, t_end, dt_int)
     dx_dt = np.full_like(t_int, target_speed)
     dy_dt = np.zeros_like(t_int)
     
@@ -99,7 +99,7 @@ def generate_crg_road():
     u_int = np.cumsum(ds_int)
     # Insert 0 at start
     u_int = np.insert(u_int, 0, 0.0)
-    t_int = np.insert(t_int, 0, 0.0)
+    t_int = np.insert(t_int, 0, -0.5)
     dx_dt = np.insert(dx_dt, 0, target_speed)
     dy_dt = np.insert(dy_dt, 0, 0.0)
     
@@ -176,71 +176,30 @@ def generate_crg_road():
     ky = np.array(ky)
     phis = np.array(phis)
     
-    # 3. Global Coordinates and Vectorized Elevation Evaluation
-    # x_grid and y_grid of shape (Nu, Nv)
-    x_grid = x_ref[:, np.newaxis] - v_grid[np.newaxis, :] * np.sin(phi_grid[:, np.newaxis])
-    y_grid = y_ref[:, np.newaxis] + v_grid[np.newaxis, :] * np.cos(phi_grid[:, np.newaxis])
-            
-    # Vectorized wave accumulation (looping waves over Nu x Nv matrix)
-    z_grid = np.zeros((Nu, Nv))
-    for w_idx in range(len(amps)):
-        z_grid += amps[w_idx] * np.cos(kx[w_idx] * x_grid + ky[w_idx] * y_grid + phis[w_idx])
-            
-    # Write OpenCRG ASCII LRFI file
+    # 3. Global Coordinates and Elevation Evaluation (Offloaded to C++)
+    # Write parameters to a temporary file
+    temp_input_file = os.path.join(ROAD_GEN_DIR, "temp_input.txt")
     crg_file = os.path.join(ROAD_GEN_DIR, "default_road.crg")
-    with open(crg_file, "w") as f:
-        # Header block
-        f.write("$ROAD_CRG\n")
-        f.write(f"reference_line_start_u    =  0.0\n")
-        f.write(f"reference_line_end_u      =  {u_length:.1f}\n")
-        f.write(f"reference_line_increment  =  {du:.1f}\n")
-        f.write(f"long_section_v_right      =  {v_right:.2f}\n")
-        f.write(f"long_section_v_left       =  {v_left:.2f}\n")
-        f.write(f"long_section_v_increment  =  {dv:.2f}\n")
-        f.write(f"reference_line_start_x    =  0.0\n")
-        f.write(f"reference_line_start_y    =  0.0\n")
-        f.write(f"reference_line_start_phi  =  0.0\n")
-        f.write("$\n")
-        
-        # Options block
-        f.write("$ROAD_CRG_OPTS\n")
-        f.write("refline_continuation = 1.0\n")
-        f.write("$\n")
-        
-        # Data definition block
-        f.write("$KD_DEFINITION\n")
-        f.write("#:LRFI\n")
-        f.write(f"U:reference line u,m,0.000,{du:.3f}\n")
-        f.write("D:reference line phi,rad\n")
-        f.write("D:reference line slope,m/m\n")
-        f.write("D:reference line banking,m/m\n")
-        for col in range(Nv):
-            f.write(f"D:long section {col+1},m\n")
-        f.write("$\n")
-        f.write("$$$$\n")
-        
-        # Data block
-        for i, u in enumerate(u_grid):
-            # Row header: phi = phi_grid[i], slope = 0, banking = 0
-            row_data = [phi_grid[i], 0.0, 0.0]
-            # Grid elevations
-            row_data.extend(z_grid[i, :])
+    
+    with open(temp_input_file, "w") as f:
+        f.write(f"{Nu} {Nv} {len(amps)} {u_length:.3f} {du:.6f} {v_right:.6f} {v_left:.6f} {dv:.6f}\n")
+        # Reference line stations
+        for i in range(Nu):
+            f.write(f"{phi_grid[i]:.10f} {x_ref[i]:.10f} {y_ref[i]:.10f}\n")
+        # Wave components
+        for w in range(len(amps)):
+            f.write(f"{amps[w]:.10f} {kx[w]:.10f} {ky[w]:.10f} {phis[w]:.10f}\n")
             
-            # Format each value to exactly 10 characters
-            formatted_vals = []
-            for val in row_data:
-                s = f"{val:10.7f}"
-                if len(s) > 10:
-                    s = s[:10]
-                elif len(s) < 10:
-                    s = s.rjust(10)
-                formatted_vals.append(s)
-                
-            # Write in chunks of 8 values per line
-            for chunk_idx in range(0, len(formatted_vals), 8):
-                chunk = formatted_vals[chunk_idx:chunk_idx+8]
-                f.write("".join(chunk) + "\n")
-            
+    print(f"Temporary input file written to {temp_input_file}. Invoking C++ generator...")
+    
+    exe_path = os.path.join(ROAD_GEN_DIR, "generate_road.exe")
+    import subprocess
+    subprocess.run([exe_path, temp_input_file, crg_file], check=True)
+    
+    # Remove temporary file
+    if os.path.exists(temp_input_file):
+        os.remove(temp_input_file)
+        
     print(f"Generated OpenCRG road file at {crg_file}")
     
     # Copy to vehicle resources

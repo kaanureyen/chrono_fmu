@@ -105,6 +105,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     vehicle_JSON = "Vehicle.json";
     tire_JSON = "vehicle/sedan/tire/Sedan_Pac02Tire.json";
     terrain_type = 2; // Default to OpenCRG
+    tire_coll_type = 0; // Default to Single Point
     terrain_mesh_file = "";
     terrain_crg_file = "default_road.crg";
     terrain_friction = 0.8;
@@ -124,6 +125,8 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     AddFmuVariable(&tire_JSON, "tire_JSON", FmuVariable::Type::String, "1", "tire JSON",  //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);    //
+    AddFmuVariable(&tire_coll_type, "tire_coll_type", FmuVariable::Type::Integer, "1", "tire collision type (0: single, 1: four points, 2: envelope)",  //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                                       //
 
     AddFmuVariable(&terrain_type, "terrain_type", FmuVariable::Type::Integer, "1", "terrain type (0: Flat, 1: Mesh OBJ, 2: OpenCRG)",  //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                                     //
@@ -375,6 +378,17 @@ void FmuComponent::CreateVehicle() {
     tires[1] = ReadTireJSON(resolved_tire_JSON);
     tires[2] = ReadTireJSON(resolved_tire_JSON);
     tires[3] = ReadTireJSON(resolved_tire_JSON);
+
+    auto coll_type = ChTire::CollisionType::SINGLE_POINT;
+    if (tire_coll_type == 1) {
+        coll_type = ChTire::CollisionType::FOUR_POINTS;
+    } else if (tire_coll_type == 2) {
+        coll_type = ChTire::CollisionType::ENVELOPE;
+    }
+    tires[0]->SetCollisionType(coll_type);
+    tires[1]->SetCollisionType(coll_type);
+    tires[2]->SetCollisionType(coll_type);
+    tires[3]->SetCollisionType(coll_type);
 
     tires[0]->Initialize(wheel_data[0].wheel);
     tires[1]->Initialize(wheel_data[1].wheel);
