@@ -39,10 +39,14 @@ int main(int argc, char* argv[]) {
 
     // Command-line parameters with defaults
     bool visible = true;
+    int steering_type = 1;      // Default to Stanley (1). 0 for PID.
     double Kp_steering = 1.0;
+    double Ki_steering = 0.0;
+    double Kd_steering = 0.0;
     double look_ahead_dist = 6.0;
     double Kp_speed = 0.5;
     double Ki_speed = 0.1;
+    double Kd_speed = 0.0;
     double max_torque = 350.0;
     double init_vel = 16.6667; // 60 kph
     std::string out_file = "lane_change_trajectory.csv";
@@ -57,14 +61,22 @@ int main(int argc, char* argv[]) {
             visible = false;
         } else if (arg == "--visible") {
             visible = true;
+        } else if (arg == "--steering_type" && i + 1 < argc) {
+            steering_type = std::stoi(argv[++i]);
         } else if (arg == "--Kp_steering" && i + 1 < argc) {
             Kp_steering = std::stod(argv[++i]);
+        } else if (arg == "--Ki_steering" && i + 1 < argc) {
+            Ki_steering = std::stod(argv[++i]);
+        } else if (arg == "--Kd_steering" && i + 1 < argc) {
+            Kd_steering = std::stod(argv[++i]);
         } else if (arg == "--look_ahead_dist" && i + 1 < argc) {
             look_ahead_dist = std::stod(argv[++i]);
         } else if (arg == "--Kp_speed" && i + 1 < argc) {
             Kp_speed = std::stod(argv[++i]);
         } else if (arg == "--Ki_speed" && i + 1 < argc) {
             Ki_speed = std::stod(argv[++i]);
+        } else if (arg == "--Kd_speed" && i + 1 < argc) {
+            Kd_speed = std::stod(argv[++i]);
         } else if (arg == "--max_torque" && i + 1 < argc) {
             max_torque = std::stod(argv[++i]);
         } else if (arg == "--init_vel" && i + 1 < argc) {
@@ -84,10 +96,14 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Parameters:" << std::endl;
     std::cout << "  visible:         " << (visible ? "true" : "false") << std::endl;
+    std::cout << "  steering_type:   " << (steering_type == 1 ? "1 (Stanley)" : "0 (PID)") << std::endl;
     std::cout << "  Kp_steering:     " << Kp_steering << std::endl;
+    std::cout << "  Ki_steering:     " << Ki_steering << std::endl;
+    std::cout << "  Kd_steering:     " << Kd_steering << std::endl;
     std::cout << "  look_ahead_dist: " << look_ahead_dist << std::endl;
     std::cout << "  Kp_speed:        " << Kp_speed << std::endl;
     std::cout << "  Ki_speed:        " << Ki_speed << std::endl;
+    std::cout << "  Kd_speed:        " << Kd_speed << std::endl;
     std::cout << "  max_torque:      " << max_torque << std::endl;
     std::cout << "  init_vel:        " << init_vel << std::endl;
     std::cout << "  out_file:        " << out_file << std::endl;
@@ -246,11 +262,14 @@ int main(int argc, char* argv[]) {
     try {
         // Configure Driver FMU parameters
         driver_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
-        driver_fmu.SetVariable("steering_type", 1, FmuVariable::Type::Integer); // Stanley steering
+        driver_fmu.SetVariable("steering_type", steering_type, FmuVariable::Type::Integer);
         driver_fmu.SetVariable("Kp_steering", Kp_steering, FmuVariable::Type::Real);
+        driver_fmu.SetVariable("Ki_steering", Ki_steering, FmuVariable::Type::Real);
+        driver_fmu.SetVariable("Kd_steering", Kd_steering, FmuVariable::Type::Real);
         driver_fmu.SetVariable("look_ahead_dist", look_ahead_dist, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Kp_speed", Kp_speed, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Ki_speed", Ki_speed, FmuVariable::Type::Real);
+        driver_fmu.SetVariable("Kd_speed", Kd_speed, FmuVariable::Type::Real);
         driver_fmu.SetVariable("fps", fps, FmuVariable::Type::Real);
 
         // Exit initialization mode for Driver so we can query its path start position/heading
