@@ -45,6 +45,8 @@ add_custom_target(stage_fmu_resources ALL
     # Copy fonts from Chrono data
     COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_DATA_DIR}/fonts/arial8.xml" "${COMPONENT_RESOURCES_DIR}/fonts/"
     COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_DATA_DIR}/fonts/arial80.bmp" "${COMPONENT_RESOURCES_DIR}/fonts/"
+    # Copy colormaps from Chrono data
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CHRONO_DATA_DIR}/colormaps" "${COMPONENT_RESOURCES_DIR}/colormaps"
     COMMENT "Staging FMU resources at build time..."
 )
 
