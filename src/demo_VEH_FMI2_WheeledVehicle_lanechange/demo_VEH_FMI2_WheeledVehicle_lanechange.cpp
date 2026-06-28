@@ -237,7 +237,7 @@ int main(int argc, char* argv[]) {
 
     try {
         // Configure Driver FMU parameters
-        driver_fmu.SetVariable("visible", visible);
+        driver_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
         driver_fmu.SetVariable("steering_type", 1, FmuVariable::Type::Integer); // Stanley steering
         driver_fmu.SetVariable("Kp_steering", Kp_steering, FmuVariable::Type::Real);
         driver_fmu.SetVariable("look_ahead_dist", look_ahead_dist, FmuVariable::Type::Real);
@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
 
     try {
         // Configure Vehicle FMU parameters using aligned initial conditions
-        vehicle_fmu.SetVariable("visible", visible);
+        vehicle_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
         vehicle_fmu.SetVecVariable("init_loc", init_loc);
         vehicle_fmu.SetVariable("init_yaw", init_yaw, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("init_vel", init_vel, FmuVariable::Type::Real);
