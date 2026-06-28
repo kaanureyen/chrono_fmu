@@ -98,6 +98,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     fps = 30;
     m_visible = visible;
     fmu_visible = false;
+    vis_driver = 0;
 
     // Get default JSON files (relative to FMU resources at runtime)
     resources_dir = std::string(fmuResourceLocation).erase(0, 8);
@@ -142,6 +143,9 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     AddFmuVariable(&system_SMC, "system_SMC", FmuVariable::Type::Boolean, "1", "use SMC system",  //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);   //
+
+    AddFmuVariable(&vis_driver, "vis_driver", FmuVariable::Type::Integer, "1", "visual driver (0: default, 1: OpenGL, 2: D3D9, 3: Software, 4: Burning)", //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed); //
 
     AddFmuVecVariable(init_loc, "init_loc", "m", "initial location",                                //
                       FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);  //
@@ -594,6 +598,23 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
     }
     if (vis_sys) {
         std::cout << " Enable run-time visualization" << std::endl;
+
+        // Set visual driver type if configured
+        if (vis_driver == 1) {
+            vis_sys->SetDriverType(irr::video::EDT_OPENGL);
+            std::cout << "  Using video driver: OpenGL" << std::endl;
+        } else if (vis_driver == 2) {
+            vis_sys->SetDriverType(irr::video::EDT_DIRECT3D9);
+            std::cout << "  Using video driver: Direct3D 9" << std::endl;
+        } else if (vis_driver == 3) {
+            vis_sys->SetDriverType(irr::video::EDT_SOFTWARE);
+            std::cout << "  Using video driver: Software Rasterizer" << std::endl;
+        } else if (vis_driver == 4) {
+            vis_sys->SetDriverType(irr::video::EDT_BURNINGSVIDEO);
+            std::cout << "  Using video driver: Burning's Video Software Rasterizer" << std::endl;
+        } else {
+            std::cout << "  Using video driver: Default Irrlicht Selection" << std::endl;
+        }
 
         vis_sys->SetLogLevel(irr::ELL_NONE);
         vis_sys->SetJPEGQuality(100);

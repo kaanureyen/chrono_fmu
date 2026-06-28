@@ -136,6 +136,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     double init_vel;                           ///< initial vehicle forward velocity
     chrono::ChVector3d g_acc;                  ///< gravitational acceleration
     double step_size;                          ///< integration step size
+    int vis_driver;                            ///< visual driver (0: default, 1: OpenGL, 2: D3D9, 3: Software, 4: Burning's Video)
 
     // FMU continuous inputs and outputs for co-simulation (vehicle-terrain)
     chrono::vehicle::DriverInputs driver_inputs;  ///< vehicle control inputs (input)

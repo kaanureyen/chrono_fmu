@@ -169,6 +169,7 @@ void SynchronizeDriver(double time, FmuChronoUnit& vehicle_fmu, double& steering
 void RunSimulation(const std::string& vehicle_fmu_filename, const std::string& vehicle_unpack_dir,
                    const std::string& tire_JSON_rel, const std::string& out_file,
                    double step_size, double start_time, double stop_time, double fps, bool visible,
+                   int vis_driver = 0,
                    int terrain_type = 0, const std::string& terrain_mesh_file = "", const std::string& terrain_crg_file = "",
                    const ChVector3d& init_loc = ChVector3d(0, 0, 0.2)) {
     FmuChronoUnit vehicle_fmu;
@@ -244,6 +245,7 @@ void RunSimulation(const std::string& vehicle_fmu_filename, const std::string& v
             std::cout << "Configuring terrain CRG file: " << terrain_crg_file << std::endl;
             vehicle_fmu.SetVariable("terrain_crg_file", terrain_crg_file);
         }
+        vehicle_fmu.SetVariable("vis_driver", vis_driver, FmuVariable::Type::Integer);
     }
     vehicle_fmu.ExitInitializationMode();
 
@@ -260,20 +262,26 @@ void RunSimulation(const std::string& vehicle_fmu_filename, const std::string& v
     ChTimer timer;
     timer.start();
 
-    while (time < stop_time) {
-        // Update driver inputs
-        SynchronizeDriver(time, vehicle_fmu, steering, braking, torque_FL, torque_FR, torque_RL, torque_RR);
+    try {
+        while (time < stop_time) {
+            // Update driver inputs
+            SynchronizeDriver(time, vehicle_fmu, steering, braking, torque_FL, torque_FR, torque_RL, torque_RR);
 
-        // Fetch vehicle reference frame to record trajectory
-        vehicle_fmu.GetFrameMovingVariable("ref_frame", ref_frame);
-        csv << time << ref_frame.GetPos() << ref_frame.GetRot().GetCardanAnglesXYZ() << std::endl;
+            // Fetch vehicle reference frame to record trajectory
+            vehicle_fmu.GetFrameMovingVariable("ref_frame", ref_frame);
+            csv << time << ref_frame.GetPos() << ref_frame.GetRot().GetCardanAnglesXYZ() << std::endl;
 
-        // Advance FMU
-        auto status_vehicle = vehicle_fmu.DoStep(time, step_size, fmi2True);
-        if (status_vehicle == fmi2Discard)
-            break;
+            // Advance FMU
+            auto status_vehicle = vehicle_fmu.DoStep(time, step_size, fmi2True);
+            if (status_vehicle == fmi2Discard)
+                break;
 
-        time += step_size;
+            time += step_size;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "EXCEPTION during simulation: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "UNKNOWN EXCEPTION during simulation!" << std::endl;
     }
 
     timer.stop();
@@ -292,6 +300,7 @@ int main(int argc, char* argv[]) {
     std::string vehicle_fmu_model_identifier = "FMU2cs_WheeledVehicle4Torques";
     std::string vehicle_fmu_filename;
     bool vehicle_visible = true;
+    int vis_driver_type = 0; // 0: default, 1: OpenGL, 2: D3D9, 3: Software, 4: Burning
 
     // Check arguments
     for (int i = 1; i < argc; ++i) {
@@ -300,6 +309,8 @@ int main(int argc, char* argv[]) {
             vehicle_visible = false;
         } else if (arg == "--visible") {
             vehicle_visible = true;
+        } else if (arg == "--vis_driver" && i + 1 < argc) {
+            vis_driver_type = std::stoi(argv[++i]);
         } else if (arg[0] != '-') {
             vehicle_fmu_filename = arg;
         }
@@ -358,19 +369,23 @@ int main(int argc, char* argv[]) {
     std::string out_file_pacejka = out_dir + "/vehicle_4torques_pacejka.out";
     RunSimulation(vehicle_fmu_filename, vehicle_unpack_dir,
                   "vehicle/sedan/tire/Sedan_Pac02Tire.json", out_file_pacejka,
-                  step_size, start_time, stop_time, fps, vehicle_visible);
+                  step_size, start_time, stop_time, fps, vehicle_visible,
+                  vis_driver_type,
+                  0, "", "");
 
     // Run 2: TMeasy Tire
     std::string out_file_tmeasy = out_dir + "/vehicle_4torques_tmeasy.out";
     RunSimulation(vehicle_fmu_filename, vehicle_unpack_dir,
                   "vehicle/sedan/tire/Sedan_TMeasyTire.json", out_file_tmeasy,
-                  step_size, start_time, stop_time, fps, vehicle_visible);
+                  step_size, start_time, stop_time, fps, vehicle_visible,
+                  vis_driver_type);
 
     // Run 3: Pacejka Tire with generated .crg Terrain
     std::string out_file_crg = out_dir + "/vehicle_4torques_crg.out";
     RunSimulation(vehicle_fmu_filename, vehicle_unpack_dir,
                   "vehicle/sedan/tire/Sedan_Pac02Tire.json", out_file_crg,
                   step_size, start_time, stop_time, fps, vehicle_visible,
+                  vis_driver_type,
                   2, "", "default_road.crg");
 
     std::cout << "\nAll runs completed (Flat, CRG). Out files placed in: " << out_dir << std::endl;
