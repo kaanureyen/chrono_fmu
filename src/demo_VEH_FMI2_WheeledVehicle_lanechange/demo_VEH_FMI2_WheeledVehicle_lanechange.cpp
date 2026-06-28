@@ -168,15 +168,18 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> logCategories = {"logAll"};
 
     std::filesystem::path build_dir = exe_dir.parent_path().parent_path();
-    std::string vehicle_unpack_dir = std::filesystem::absolute(build_dir / "tmp_unpack_vehicle_lc").string() + "/";
-    std::string driver_unpack_dir = std::filesystem::absolute(build_dir / "tmp_unpack_driver_lc").string() + "/";
     vehicle_fmu_filename = std::filesystem::absolute(vehicle_fmu_filename).string();
     driver_fmu_filename = std::filesystem::absolute(driver_fmu_filename).string();
 
     std::filesystem::path out_file_path(out_file);
     if (out_file_path.is_relative()) {
         out_file = std::filesystem::absolute(build_dir / out_file_path).string();
+        out_file_path = std::filesystem::path(out_file);
     }
+
+    std::string suffix = out_file_path.stem().string();
+    std::string vehicle_unpack_dir = std::filesystem::absolute(build_dir / ("tmp_unpack_vehicle_lc_" + suffix)).string() + "/";
+    std::string driver_unpack_dir = std::filesystem::absolute(build_dir / ("tmp_unpack_driver_lc_" + suffix)).string() + "/";
 
     if (!std::filesystem::exists(vehicle_fmu_filename)) {
         std::cerr << "ERROR: Vehicle FMU file not found: " << vehicle_fmu_filename << std::endl;
@@ -401,6 +404,9 @@ int main(int argc, char* argv[]) {
 
     csv.WriteToFile(out_file);
     std::cout << "Trajectory written to: " << out_file << std::endl;
+
+    std::filesystem::remove_all(vehicle_unpack_dir);
+    std::filesystem::remove_all(driver_unpack_dir);
 
     return 0;
 }
