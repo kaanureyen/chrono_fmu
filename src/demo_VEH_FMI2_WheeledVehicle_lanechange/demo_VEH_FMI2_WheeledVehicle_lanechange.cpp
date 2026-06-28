@@ -40,12 +40,12 @@ int main(int argc, char* argv[]) {
     // Command-line parameters with defaults
     bool visible = true;
     int steering_type = 1;      // Default to Stanley (1). 0 for PID.
-    double Kp_steering = 1.0;
-    double Ki_steering = 0.0;
+    double Kp_steering = -1.0;
+    double Ki_steering = -1.0;
     double Kd_steering = 0.0;
-    double look_ahead_dist = 6.0;
-    double Kp_speed = 0.5;
-    double Ki_speed = 0.1;
+    double look_ahead_dist = -1.0;
+    double Kp_speed = 0.868900;
+    double Ki_speed = 0.436516;
     double Kd_speed = 0.0;
     double max_torque = 350.0;
     double init_vel = 16.6667; // 60 kph
@@ -98,6 +98,17 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--terrain" && i + 1 < argc) {
             terrain_type = std::stoi(argv[++i]);
         }
+    }
+
+    // Apply optimized defaults depending on steering controller type if not overridden
+    if (steering_type == 1) { // Stanley
+        if (Kp_steering < 0) Kp_steering = 1.995262;
+        if (Ki_steering < 0) Ki_steering = 0.0;
+        if (look_ahead_dist < 0) look_ahead_dist = 3.615358;
+    } else { // PID
+        if (Kp_steering < 0) Kp_steering = 0.954993;
+        if (Ki_steering < 0) Ki_steering = 0.01;
+        if (look_ahead_dist < 0) look_ahead_dist = 5.225782;
     }
 
     std::cout << "Parameters:" << std::endl;
