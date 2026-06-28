@@ -121,7 +121,7 @@ class RoadGeneratorGUI:
         add_field(4, "Lane Change Width (m):", "width_var", 5.0, "(Lateral offset amplitude)")
         add_field(5, "Start Length Margin (m):", "start_margin_var", 20.0, "(Extra terrain behind vehicle)")
         add_field(6, "End Length Margin (m):", "end_margin_var", 50.0, "(Extra terrain ahead at end)")
-        add_field(7, "Mesh Grid Resolution (m):", "mesh_res_var", 0.06, "(du and dv spacing)")
+        add_field(7, "Mesh Grid Resolution (m):", "mesh_res_var", 0.25, "(du and dv spacing)")
         add_field(8, "Road Width (m):", "r_width_var", 8.0, "(Flat boundary width)")
 
         # ISO Class dropdown

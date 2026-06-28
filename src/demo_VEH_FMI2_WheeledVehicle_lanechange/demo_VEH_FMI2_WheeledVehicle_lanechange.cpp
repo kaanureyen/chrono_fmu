@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
     int tire_coll_type = 2;    // Default: 2 (2D Profile Envelope)
     double stop_time = 10.0;
     double fps = 30.0;         // Default to 30 FPS rendering frame rate
+    int terrain_type = 2;      // Default: 2 (OpenCRG), 1 (OBJ Mesh)
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -76,6 +77,8 @@ int main(int argc, char* argv[]) {
             stop_time = std::stod(argv[++i]);
         } else if (arg == "--fps" && i + 1 < argc) {
             fps = std::stod(argv[++i]);
+        } else if (arg == "--terrain" && i + 1 < argc) {
+            terrain_type = std::stoi(argv[++i]);
         }
     }
 
@@ -91,6 +94,7 @@ int main(int argc, char* argv[]) {
     std::cout << "  tire_coll_type:  " << tire_coll_type << std::endl;
     std::cout << "  stop_time:       " << stop_time << std::endl;
     std::cout << "  fps:             " << fps << std::endl;
+    std::cout << "  terrain_type:    " << (terrain_type == 1 ? "1 (OBJ Mesh)" : "2 (OpenCRG)") << std::endl;
 
     std::string vehicle_fmu_filename = "FMU2cs_WheeledVehicle4Torques.fmu";
     std::string driver_fmu_filename = "FMU2cs_PathFollowerDriver.fmu";
@@ -188,8 +192,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "ERROR: Vehicle.json is missing in the unpacked Vehicle FMU resources!" << std::endl;
         return 1;
     }
-    if (!std::filesystem::exists(vehicle_resources_path / "default_road.crg")) {
+    if (terrain_type == 2 && !std::filesystem::exists(vehicle_resources_path / "default_road.crg")) {
         std::cerr << "ERROR: default_road.crg is missing in the unpacked Vehicle FMU resources!" << std::endl;
+        return 1;
+    }
+    if (terrain_type == 1 && !std::filesystem::exists(vehicle_resources_path / "default_road.obj")) {
+        std::cerr << "ERROR: default_road.obj is missing in the unpacked Vehicle FMU resources!" << std::endl;
         return 1;
     }
 
@@ -264,8 +272,12 @@ int main(int argc, char* argv[]) {
         vehicle_fmu.SetVecVariable("init_loc", init_loc);
         vehicle_fmu.SetVariable("init_yaw", init_yaw, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("init_vel", init_vel, FmuVariable::Type::Real);
-        vehicle_fmu.SetVariable("terrain_type", 2, FmuVariable::Type::Integer); // OpenCRG
-        vehicle_fmu.SetVariable("terrain_crg_file", "default_road.crg");
+        vehicle_fmu.SetVariable("terrain_type", terrain_type, FmuVariable::Type::Integer);
+        if (terrain_type == 1) {
+            vehicle_fmu.SetVariable("terrain_mesh_file", std::string("default_road.obj"));
+        } else {
+            vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"));
+        }
         vehicle_fmu.SetVariable("tire_coll_type", tire_coll_type, FmuVariable::Type::Integer);
         vehicle_fmu.SetVariable("step_size", step_size, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("fps", fps, FmuVariable::Type::Real);

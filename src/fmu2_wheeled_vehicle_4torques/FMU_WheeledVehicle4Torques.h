@@ -54,7 +54,10 @@
 #endif
 
 
+class VehicleFrictionFunctor;
+
 class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
+    friend class VehicleFrictionFunctor;
   public:
     FmuComponent(fmi2String instanceName,
                  fmi2Type fmuType,
@@ -147,6 +150,12 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     double torque_FR;  ///< Front Right wheel torque (input)
     double torque_RL;  ///< Rear Left wheel torque (input)
     double torque_RR;  ///< Rear Right wheel torque (input)
+
+    // FMU continuous inputs for 4 independent wheel friction coefficients
+    double friction_FL;  ///< Front Left wheel friction coefficient (input)
+    double friction_FR;  ///< Front Right wheel friction coefficient (input)
+    double friction_RL;  ///< Rear Left wheel friction coefficient (input)
+    double friction_RR;  ///< Rear Right wheel friction coefficient (input)
 
     // FMU continuous inputs for active suspension forces
     double act_force_FL;  ///< Front Left active suspension force (input)

@@ -45,6 +45,50 @@ using namespace chrono;
 using namespace chrono::vehicle;
 using namespace chrono::fmi2;
 
+class VehicleFrictionFunctor : public ChTerrain::FrictionFunctor {
+  public:
+    VehicleFrictionFunctor(FmuComponent* fmu) : m_fmu(fmu) {}
+    
+    virtual float operator()(const ChVector3d& loc) override {
+        if (!m_fmu || !m_fmu->vehicle)
+            return 0.8f;
+            
+        // Get wheel spindle positions
+        auto pos_FL = m_fmu->vehicle->GetSpindlePos(0, LEFT);
+        auto pos_FR = m_fmu->vehicle->GetSpindlePos(0, RIGHT);
+        auto pos_RL = m_fmu->vehicle->GetSpindlePos(1, LEFT);
+        auto pos_RR = m_fmu->vehicle->GetSpindlePos(1, RIGHT);
+        
+        // Calculate distances squared in x-y plane
+        double d_FL = (loc.x() - pos_FL.x()) * (loc.x() - pos_FL.x()) + (loc.y() - pos_FL.y()) * (loc.y() - pos_FL.y());
+        double d_FR = (loc.x() - pos_FR.x()) * (loc.x() - pos_FR.x()) + (loc.y() - pos_FR.y()) * (loc.y() - pos_FR.y());
+        double d_RL = (loc.x() - pos_RL.x()) * (loc.x() - pos_RL.x()) + (loc.y() - pos_RL.y()) * (loc.y() - pos_RL.y());
+        double d_RR = (loc.x() - pos_RR.x()) * (loc.x() - pos_RR.x()) + (loc.y() - pos_RR.y()) * (loc.y() - pos_RR.y());
+        
+        // Find the closest spindle
+        double d_min = d_FL;
+        float friction = (float)m_fmu->friction_FL;
+        
+        if (d_FR < d_min) {
+            d_min = d_FR;
+            friction = (float)m_fmu->friction_FR;
+        }
+        if (d_RL < d_min) {
+            d_min = d_RL;
+            friction = (float)m_fmu->friction_RL;
+        }
+        if (d_RR < d_min) {
+            d_min = d_RR;
+            friction = (float)m_fmu->friction_RR;
+        }
+        
+        return friction;
+    }
+    
+  private:
+    FmuComponent* m_fmu;
+};
+
 // -----------------------------------------------------------------------------
 
 // Create an instance of this FMU
@@ -109,6 +153,11 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     terrain_mesh_file = "";
     terrain_crg_file = "default_road.crg";
     terrain_friction = 0.8;
+
+    friction_FL = 0.8;
+    friction_FR = 0.8;
+    friction_RL = 0.8;
+    friction_RR = 0.8;
 
     // Set wheel identifier strings
     wheel_data[0].identifier = "FL";
@@ -190,6 +239,15 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     AddFmuVariable(&act_force_RL, "act_force_RL", FmuVariable::Type::Real, "N", "Rear Left active suspension force",  //
                    FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
     AddFmuVariable(&act_force_RR, "act_force_RR", FmuVariable::Type::Real, "N", "Rear Right active suspension force", //
+                   FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
+
+    AddFmuVariable(&friction_FL, "friction_FL", FmuVariable::Type::Real, "1", "Front Left wheel friction coefficient", //
+                   FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
+    AddFmuVariable(&friction_FR, "friction_FR", FmuVariable::Type::Real, "1", "Front Right wheel friction coefficient", //
+                   FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
+    AddFmuVariable(&friction_RL, "friction_RL", FmuVariable::Type::Real, "1", "Rear Left wheel friction coefficient", //
+                   FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
+    AddFmuVariable(&friction_RR, "friction_RR", FmuVariable::Type::Real, "1", "Rear Right wheel friction coefficient", //
                    FmuVariable::CausalityType::input, FmuVariable::VariabilityType::continuous);               //
 
 
@@ -362,6 +420,10 @@ void FmuComponent::CreateVehicle() {
         terrain = chrono_types::make_shared<FlatTerrain>(0.0, terrain_friction);
         std::cout << "Configured FlatTerrain with friction: " << terrain_friction << std::endl;
     }
+
+    // Register custom wheel-specific friction functor
+    auto friction_functor = chrono_types::make_shared<VehicleFrictionFunctor>(this);
+    terrain->RegisterFrictionFunctor(friction_functor);
 
     // Create and initialize the tires
     std::cout << "[DEBUG] Configuring tires..." << std::endl;
