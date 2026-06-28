@@ -80,17 +80,17 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     fmu_visible = false;
     reset = false;
 
-    look_ahead_dist = 6.0;
+    look_ahead_dist = 3.615358;
     steering_type = 1; // Default to Stanley
-    Kp_steering = 1.0;
+    Kp_steering = 1.995262;
     Ki_steering = 0.0;
     Kd_steering = 0.0;
     stanley_dead_zone = 0.0;
     max_wheel_turn_angle = 0.43633;
 
     throttle_threshold = 0.2;
-    Kp_speed = 0.5;
-    Ki_speed = 0.1;
+    Kp_speed = 0.868900;
+    Ki_speed = 0.436516;
     Kd_speed = 0.0;
 
     init_loc = VNULL;
