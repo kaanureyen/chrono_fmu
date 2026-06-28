@@ -50,6 +50,8 @@ int main(int argc, char* argv[]) {
     double max_torque = 350.0;
     double init_vel = 16.6667; // 60 kph
     std::string out_file = "lane_change_trajectory.csv";
+    std::string path_file_arg = "";
+    std::string terrain_crg_file_arg = "";
     int tire_coll_type = 2;    // Default: 2 (2D Profile Envelope)
     double stop_time = 10.0;
     double fps = 30.0;         // Default to 30 FPS rendering frame rate
@@ -83,6 +85,10 @@ int main(int argc, char* argv[]) {
             init_vel = std::stod(argv[++i]);
         } else if (arg == "--output" && i + 1 < argc) {
             out_file = argv[++i];
+        } else if (arg == "--path_file" && i + 1 < argc) {
+            path_file_arg = argv[++i];
+        } else if (arg == "--terrain_crg_file" && i + 1 < argc) {
+            terrain_crg_file_arg = argv[++i];
         } else if (arg == "--tire_coll_type" && i + 1 < argc) {
             tire_coll_type = std::stoi(argv[++i]);
         } else if (arg == "--tend" && i + 1 < argc) {
@@ -107,6 +113,8 @@ int main(int argc, char* argv[]) {
     std::cout << "  max_torque:      " << max_torque << std::endl;
     std::cout << "  init_vel:        " << init_vel << std::endl;
     std::cout << "  out_file:        " << out_file << std::endl;
+    std::cout << "  path_file:       " << path_file_arg << std::endl;
+    std::cout << "  terrain_crg:     " << terrain_crg_file_arg << std::endl;
     std::cout << "  tire_coll_type:  " << tire_coll_type << std::endl;
     std::cout << "  stop_time:       " << stop_time << std::endl;
     std::cout << "  fps:             " << fps << std::endl;
@@ -198,15 +206,33 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Verify unpacked driver resources
     std::filesystem::path driver_resources_path = std::filesystem::path(driver_unpack_dir) / "resources";
+    std::filesystem::path vehicle_resources_path = std::filesystem::path(vehicle_unpack_dir) / "resources";
+
+    if (!path_file_arg.empty()) {
+        std::filesystem::path p_src(path_file_arg);
+        if (std::filesystem::exists(p_src)) {
+            std::filesystem::copy_file(p_src, driver_resources_path / p_src.filename(), std::filesystem::copy_options::overwrite_existing);
+        } else {
+            std::cerr << "WARNING: Custom path file not found: " << path_file_arg << std::endl;
+        }
+    }
+    if (!terrain_crg_file_arg.empty()) {
+        std::filesystem::path p_src(terrain_crg_file_arg);
+        if (std::filesystem::exists(p_src)) {
+            std::filesystem::copy_file(p_src, vehicle_resources_path / p_src.filename(), std::filesystem::copy_options::overwrite_existing);
+        } else {
+            std::cerr << "WARNING: Custom CRG file not found: " << terrain_crg_file_arg << std::endl;
+        }
+    }
+
+    // Verify unpacked driver resources
     if (!std::filesystem::exists(driver_resources_path / "default_lane_change_path.txt")) {
         std::cerr << "ERROR: default_lane_change_path.txt is missing in the unpacked Driver FMU resources!" << std::endl;
         return 1;
     }
 
     // Verify unpacked vehicle resources
-    std::filesystem::path vehicle_resources_path = std::filesystem::path(vehicle_unpack_dir) / "resources";
     if (!std::filesystem::exists(vehicle_resources_path / "Vehicle.json")) {
         std::cerr << "ERROR: Vehicle.json is missing in the unpacked Vehicle FMU resources!" << std::endl;
         return 1;
@@ -265,6 +291,11 @@ int main(int argc, char* argv[]) {
     try {
         // Configure Driver FMU parameters
         driver_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
+        if (!path_file_arg.empty()) {
+            driver_fmu.SetVariable("path_file", std::filesystem::path(path_file_arg).filename().string(), FmuVariable::Type::String);
+        } else {
+            driver_fmu.SetVariable("path_file", std::string("default_lane_change_path.txt"), FmuVariable::Type::String);
+        }
         driver_fmu.SetVariable("steering_type", steering_type, FmuVariable::Type::Integer);
         driver_fmu.SetVariable("Kp_steering", Kp_steering, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Ki_steering", Ki_steering, FmuVariable::Type::Real);
@@ -298,7 +329,11 @@ int main(int argc, char* argv[]) {
         if (terrain_type == 1) {
             vehicle_fmu.SetVariable("terrain_mesh_file", std::string("default_road.obj"));
         } else {
-            vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"));
+            if (!terrain_crg_file_arg.empty()) {
+                vehicle_fmu.SetVariable("terrain_crg_file", std::filesystem::path(terrain_crg_file_arg).filename().string(), FmuVariable::Type::String);
+            } else {
+                vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"), FmuVariable::Type::String);
+            }
         }
         vehicle_fmu.SetVariable("tire_coll_type", tire_coll_type, FmuVariable::Type::Integer);
         vehicle_fmu.SetVariable("step_size", step_size, FmuVariable::Type::Real);
