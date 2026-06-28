@@ -82,10 +82,10 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     look_ahead_dist = 3.615358;
     steering_type = 1; // Default to Stanley
-    Kp_steering = 2.187761;
+    Kp_steering = 2.398832;
     Ki_steering = 0.0;
     Kd_steering = 0.0;
-    stanley_dead_zone = 0.010000;
+    stanley_dead_zone = 0.010965;
     max_wheel_turn_angle = 0.43633;
 
     throttle_threshold = 0.2;

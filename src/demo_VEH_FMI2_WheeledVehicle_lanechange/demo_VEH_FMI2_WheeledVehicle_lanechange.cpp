@@ -105,14 +105,14 @@ int main(int argc, char* argv[]) {
 
     // Apply optimized defaults depending on steering controller type if not overridden
     if (steering_type == 1) { // Stanley
-        if (Kp_steering < 0) Kp_steering = 2.187761;
+        if (Kp_steering < 0) Kp_steering = 2.398832;
         if (Ki_steering < 0) Ki_steering = 0.0;
         if (look_ahead_dist < 0) look_ahead_dist = 3.615358;
-        if (stanley_dead_zone < 0) stanley_dead_zone = 0.010000;
+        if (stanley_dead_zone < 0) stanley_dead_zone = 0.010965;
     } else { // PID
-        if (Kp_steering < 0) Kp_steering = 0.954993;
+        if (Kp_steering < 0) Kp_steering = 1.047129;
         if (Ki_steering < 0) Ki_steering = 0.01;
-        if (look_ahead_dist < 0) look_ahead_dist = 5.225782;
+        if (look_ahead_dist < 0) look_ahead_dist = 4.990583;
         if (stanley_dead_zone < 0) stanley_dead_zone = 0.0;
     }
 
