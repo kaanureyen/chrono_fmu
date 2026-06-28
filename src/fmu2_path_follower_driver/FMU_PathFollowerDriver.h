@@ -117,6 +117,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     double fps;            ///< snapshot saving frequency (in FPS)
     fmi2Boolean m_visible;        ///< visual window setting from instantiation
     fmi2Boolean fmu_visible;      ///< visual window setting from parameter
+    fmi2Boolean reset;            ///< reset input to trigger state reset
 
     // Vehicle driver commands (FMU continuous outputs)
     double steering;  ///< steering command, in [-1,1]

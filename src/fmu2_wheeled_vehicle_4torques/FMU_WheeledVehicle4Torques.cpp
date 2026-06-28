@@ -142,6 +142,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     fps = 30;
     m_visible = visible;
     fmu_visible = false;
+    reset = false;
 
     // Get default JSON files (relative to FMU resources at runtime)
     resources_dir = std::string(fmuResourceLocation).erase(0, 8);
@@ -253,6 +254,8 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     // Set DISCRETE INPUTS for this FMU (I/O) [rebuilt]
     AddFmuVariable(&save_img, "save_img", FmuVariable::Type::Boolean, "1", "trigger saving images",  //
+                   FmuVariable::CausalityType::input, FmuVariable::VariabilityType::discrete);               //
+    AddFmuVariable(&reset, "reset", FmuVariable::Type::Boolean, "1", "reset simulation state",              //
                    FmuVariable::CausalityType::input, FmuVariable::VariabilityType::discrete);               //
 
     // Set CONTINUOUS OUTPUTS for this FMU (vehicle reference frame)
@@ -674,6 +677,20 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
 }
 
 fmi2Status FmuComponent::doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real communicationStepSize, fmi2Boolean noSetFMUStatePriorToCurrentPoint) {
+    if (reset) {
+        reset = fmi2False;
+        m_time = currentCommunicationPoint;
+        vehicle->GetSystem()->SetChTime(currentCommunicationPoint);
+        vehicle->Initialize(ChCoordsys<>(init_loc + ChVector3d(0, 0, 0.5), QuatFromAngleZ(init_yaw)), init_vel);
+        for (int i = 0; i < 4; i++) {
+            tires[i]->Initialize(wheel_data[i].wheel);
+        }
+#ifdef CHRONO_IRRLICHT
+        render_frame = 0;
+        last_render_time = currentCommunicationPoint;
+#endif
+    }
+
     while (m_time < currentCommunicationPoint + communicationStepSize) {
         fmi2Real h = std::min((currentCommunicationPoint + communicationStepSize - m_time), std::min(communicationStepSize, step_size));
         vehicle->Advance(h);
