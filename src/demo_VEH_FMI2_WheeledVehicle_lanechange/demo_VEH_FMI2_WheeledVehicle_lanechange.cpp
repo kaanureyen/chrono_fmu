@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
     double Kd_speed = 0.0;
     double max_torque = 350.0;
     double init_vel = 16.6667; // 60 kph
+    double stanley_dead_zone = -1.0;
     std::string out_file = "lane_change_trajectory.csv";
     std::string path_file_arg = "";
     std::string terrain_crg_file_arg = "";
@@ -89,6 +90,8 @@ int main(int argc, char* argv[]) {
             path_file_arg = argv[++i];
         } else if (arg == "--terrain_crg_file" && i + 1 < argc) {
             terrain_crg_file_arg = argv[++i];
+        } else if (arg == "--stanley_dead_zone" && i + 1 < argc) {
+            stanley_dead_zone = std::stod(argv[++i]);
         } else if (arg == "--tire_coll_type" && i + 1 < argc) {
             tire_coll_type = std::stoi(argv[++i]);
         } else if (arg == "--tend" && i + 1 < argc) {
@@ -102,13 +105,15 @@ int main(int argc, char* argv[]) {
 
     // Apply optimized defaults depending on steering controller type if not overridden
     if (steering_type == 1) { // Stanley
-        if (Kp_steering < 0) Kp_steering = 1.995262;
+        if (Kp_steering < 0) Kp_steering = 2.187761;
         if (Ki_steering < 0) Ki_steering = 0.0;
         if (look_ahead_dist < 0) look_ahead_dist = 3.615358;
+        if (stanley_dead_zone < 0) stanley_dead_zone = 0.010000;
     } else { // PID
         if (Kp_steering < 0) Kp_steering = 0.954993;
         if (Ki_steering < 0) Ki_steering = 0.01;
         if (look_ahead_dist < 0) look_ahead_dist = 5.225782;
+        if (stanley_dead_zone < 0) stanley_dead_zone = 0.0;
     }
 
     std::cout << "Parameters:" << std::endl;
@@ -118,6 +123,7 @@ int main(int argc, char* argv[]) {
     std::cout << "  Ki_steering:     " << Ki_steering << std::endl;
     std::cout << "  Kd_steering:     " << Kd_steering << std::endl;
     std::cout << "  look_ahead_dist: " << look_ahead_dist << std::endl;
+    std::cout << "  stanley_dead_zone: " << stanley_dead_zone << std::endl;
     std::cout << "  Kp_speed:        " << Kp_speed << std::endl;
     std::cout << "  Ki_speed:        " << Ki_speed << std::endl;
     std::cout << "  Kd_speed:        " << Kd_speed << std::endl;
@@ -312,6 +318,7 @@ int main(int argc, char* argv[]) {
         driver_fmu.SetVariable("Ki_steering", Ki_steering, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Kd_steering", Kd_steering, FmuVariable::Type::Real);
         driver_fmu.SetVariable("look_ahead_dist", look_ahead_dist, FmuVariable::Type::Real);
+        driver_fmu.SetVariable("stanley_dead_zone", stanley_dead_zone, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Kp_speed", Kp_speed, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Ki_speed", Ki_speed, FmuVariable::Type::Real);
         driver_fmu.SetVariable("Kd_speed", Kd_speed, FmuVariable::Type::Real);
