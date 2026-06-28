@@ -85,7 +85,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     Ki_steering = 0.0;
     Kd_steering = 0.0;
     stanley_dead_zone = 0.0;
-    max_wheel_turn_angle = 0.523;
+    max_wheel_turn_angle = 0.43633;
 
     throttle_threshold = 0.2;
     Kp_speed = 0.5;
