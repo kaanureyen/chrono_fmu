@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
     std::string driver_fmu_filename = "FMU2cs_PathFollowerDriver.fmu";
 
     // Locate FMUs
-    std::filesystem::path exe_dir = std::filesystem::path(argv[0]).parent_path();
+    std::filesystem::path exe_dir = std::filesystem::absolute(argv[0]).parent_path();
     if (!std::filesystem::exists(vehicle_fmu_filename)) {
         std::filesystem::path p = exe_dir / "FMU2cs_WheeledVehicle4Torques" / "FMU2cs_WheeledVehicle4Torques.fmu";
         if (std::filesystem::exists(p)) {

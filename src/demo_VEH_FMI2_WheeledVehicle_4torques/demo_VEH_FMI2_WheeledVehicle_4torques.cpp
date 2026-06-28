@@ -312,7 +312,7 @@ int main(int argc, char* argv[]) {
             vehicle_fmu_filename = local_fmu;
         } else {
             // Check if the FMU file exists in the executable's directory or the parent build directory
-            std::filesystem::path exe_dir = std::filesystem::path(argv[0]).parent_path();
+            std::filesystem::path exe_dir = std::filesystem::absolute(argv[0]).parent_path();
             std::filesystem::path local_fmu_exe = exe_dir / (vehicle_fmu_model_identifier + ".fmu");
             std::filesystem::path parent_fmu = exe_dir.parent_path().parent_path() / vehicle_fmu_model_identifier / (vehicle_fmu_model_identifier + ".fmu");
             if (std::filesystem::exists(local_fmu_exe)) {
@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
     }
 
     // FMU unpack directory (portable relative to build directory)
-    std::filesystem::path exe_dir = std::filesystem::path(argv[0]).parent_path();
+    std::filesystem::path exe_dir = std::filesystem::absolute(argv[0]).parent_path();
     std::filesystem::path build_dir = exe_dir.parent_path().parent_path();
     std::string vehicle_unpack_dir = (build_dir / "tmp_unpack_vehicle_4torques").string() + "/";
 
