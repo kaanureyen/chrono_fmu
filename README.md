@@ -6,12 +6,18 @@ This repository contains custom FMI 2.0 Co-Simulation Functional Mock-up Units (
 
 ## 📂 Repository Structure
 
-* **`fmu2_wheeled_vehicle_4torques/`**: Source code, headers, and specification resources for the wheeled vehicle FMU.
-* **`fmu2_path_follower_driver/`**: Source code, headers, and path specifications for the driver controller FMU.
-* **`demo_VEH_FMI2_WheeledVehicle_4torques/`**: A straight-line acceleration, braking, and cornering co-simulation orchestrator demo.
-* **`docs/`**: Includes the [docs/kpi_analysis_report.md](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/docs/kpi_analysis_report.md) detail on KPI calculations (Comfort, Handling, Rollover Safety, Tire Wear, Actuator Power).
-* **`fmus/`**: Contains the compiled and ready-to-use `.fmu` binary packages.
-* **`scripts/`**: Batch helper scripts for configuring, building, and running.
+* **`src/`**: Source code directory grouping all C++ modules and tools:
+  * `fmu2_wheeled_vehicle_4torques/`: Wheeled vehicle FMU model source code and local config parameters.
+  * `fmu2_path_follower_driver/`: Closed-loop driver FMU controller source code.
+  * `demo_VEH_FMI2_WheeledVehicle_4torques/`: Co-simulation straight-line acceleration/braking/cornering demo.
+  * `demo_VEH_FMI2_WheeledVehicle_lanechange/`: Co-simulation Stanley lateral path-following lane change demo.
+  * `road_generator/`: Road profiling and path coordinates generator C++ utility and Python coordinator.
+* **`docs/`**: Documentation directory subdivided by topic:
+  * `docs/software/`: Software guidelines (installation, directory structure, Simulink co-simulation guide, parameter sweeps).
+  * `docs/theoretical/`: Mathematical modeling reports (KPI calculations, vehicle parameters guide, Bezier spline paths).
+* **`scripts/`**: Relative-path batch scripts to automate core Chrono bootstrapping, FMU builds, and cosim runs.
+* **`parameter_sweep.py`**: Parameter sweep grid utility to optimize driver tracking gains.
+* **`road_generator_gui.py`**: Tkinter GUI wizard to customize and generate road/path profiles interactively.
 
 ---
 
@@ -58,13 +64,15 @@ Implements a lateral path-following controller (PID or Stanley) and a longitudin
 
 ---
 
-## 🛠️ Build and Run Guide
+## 🛠️ Installation, Build, and Run Guide
 
-The `scripts/` folder contains helper batch files to configure and run the workspace (using VS2022 x64 Developer Command Prompt and Ninja):
+For complete workspace setup instructions, compiler prerequisites (using `winget`), clone commands, and automated building, see the [Installation Guide](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/docs/software/installation.md).
+
+For a quick reference, the `scripts/` folder contains helper batch files:
 
 1. **Build Chrono Library:**
-   Run [scripts/build_chrono.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/build_chrono.bat) to configure and compile the core Project Chrono dependency.
+   Run [scripts/build_chrono.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/build_chrono.bat) to configure, compile, and install Project Chrono and its dependencies (Irrlicht, OpenCRG).
 2. **Build Custom FMUs:**
-   Run [scripts/build_fmus.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/build_fmus.bat) to compile the FMUs and output packaged `.fmu` files inside the `fmus/` directory.
+   Run [scripts/build_fmus.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/build_fmus.bat) to generate paths/terrains and compile the FMUs.
 3. **Run Co-Simulation Demo:**
-   Run [scripts/run_demo.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/run_demo.bat) to execute the co-simulation demo, performing straight-line acceleration, braking with active suspension heave, and cornering simulations. Output result logs will be placed in the `DEMO_OUTPUT/` directory.
+   Run [scripts/run_demo.bat](file:///c:/Users/novo/.gemini/antigravity/scratch/chrono_fmus/scripts/run_demo.bat) to execute the orchestrator demo.

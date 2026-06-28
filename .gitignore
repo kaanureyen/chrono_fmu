@@ -11,8 +11,14 @@ bin/
 *.dir
 *.log
 *.fmu
-!fmus/*.fmu
+*.crg
 tmp_unpack*/
 DEMO_OUTPUT/
 *.dll
 *.csv
+*.exe
+*.obj
+*.pdb
+temp_input.txt
+default_lane_change_path.txt
+

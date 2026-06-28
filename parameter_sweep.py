@@ -90,12 +90,12 @@ def analyze_trajectory(csv_path):
         return None, f"Analysis error: {e}"
 
 def main():
-    # Find the compiled demo executable
+    # Find the compiled demo executable relative to the script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     possible_paths = [
-        r"build\demo_VEH_FMI2_WheeledVehicle_lanechange\demo_VEH_FMI2_WheeledVehicle_lanechange.exe",
-        r"build\bin\demo_VEH_FMI2_WheeledVehicle_lanechange.exe",
-        r"demo_VEH_FMI2_WheeledVehicle_lanechange.exe",
-        r"..\build\demo_VEH_FMI2_WheeledVehicle_lanechange\demo_VEH_FMI2_WheeledVehicle_lanechange.exe"
+        os.path.join(script_dir, "build", "src", "demo_VEH_FMI2_WheeledVehicle_lanechange", "demo_VEH_FMI2_WheeledVehicle_lanechange.exe"),
+        os.path.join(script_dir, "build", "demo_VEH_FMI2_WheeledVehicle_lanechange", "demo_VEH_FMI2_WheeledVehicle_lanechange.exe"),
+        "demo_VEH_FMI2_WheeledVehicle_lanechange.exe"
     ]
     
     exe_path = None
@@ -115,7 +115,7 @@ def main():
     look_ahead_vals = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     
     results = []
-    temp_csv = "temp_sweep_output.csv"
+    temp_csv = os.path.join(script_dir, "build", "temp_sweep_output.csv")
     
     print("\nStarting Parameter Sweep Grid...")
     print(f"{'Kp':>6} | {'LookAhead':>9} | {'Status':>20} | {'RMSE (m)':>10} | {'MaxErr (m)':>10}")

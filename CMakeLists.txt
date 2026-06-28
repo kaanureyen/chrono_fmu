@@ -6,9 +6,16 @@ project(external_fmus_project)
 include(FetchContent)
 
 # Find OpenCRG first since Chrono::Chrono_vehicle depends on target OpenCRG::OpenCRG
-list(APPEND CMAKE_MODULE_PATH "c:/Users/novo/.gemini/antigravity/scratch/chrono/cmake")
-set(OpenCRG_INCLUDE_DIR "c:/Users/novo/.gemini/antigravity/scratch/packages/openCRG/include")
-set(OpenCRG_LIBRARY "c:/Users/novo/.gemini/antigravity/scratch/packages/openCRG/lib/OpenCRG.lib")
+if(NOT DEFINED CHRONO_SRC_DIR)
+  get_filename_component(CHRONO_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../chrono" ABSOLUTE)
+endif()
+if(NOT DEFINED PACKAGES_DIR)
+  get_filename_component(PACKAGES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages" ABSOLUTE)
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${CHRONO_SRC_DIR}/cmake")
+set(OpenCRG_INCLUDE_DIR "${PACKAGES_DIR}/openCRG/include")
+set(OpenCRG_LIBRARY "${PACKAGES_DIR}/openCRG/lib/OpenCRG.lib")
 find_package(OpenCRG REQUIRED)
 
 # Find Chrono
@@ -32,7 +39,7 @@ endif()
 # We enable testing if requested
 set(TESTING_ENABLED OFF)
 
-add_subdirectory(fmu2_wheeled_vehicle_4torques)
-add_subdirectory(fmu2_path_follower_driver)
-add_subdirectory(demo_VEH_FMI2_WheeledVehicle_4torques)
-add_subdirectory(demo_VEH_FMI2_WheeledVehicle_lanechange)
+add_subdirectory(src/fmu2_wheeled_vehicle_4torques)
+add_subdirectory(src/fmu2_path_follower_driver)
+add_subdirectory(src/demo_VEH_FMI2_WheeledVehicle_4torques)
+add_subdirectory(src/demo_VEH_FMI2_WheeledVehicle_lanechange)
