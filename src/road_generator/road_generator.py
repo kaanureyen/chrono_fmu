@@ -50,10 +50,10 @@ def generate_road_profile(
     du = mesh_resolution
     dv = mesh_resolution
 
-    # Dynamic calculation of starting points behind vehicle (spawned at x = 0.0)
+    # Dynamic calculation of starting points behind vehicle
     t_start_crg = -start_length_margin / target_speed
     t_end_crg = t_end + end_length_margin / target_speed
-    t_start_path = -start_length_margin / target_speed
+    t_start_path = 0.0  # Vehicle spawns at t = 0.0 (x = start_length_margin)
     t_end_path = t_end + end_length_margin / target_speed
 
     # 2. Generate Bezier Lane Change Path
@@ -62,7 +62,7 @@ def generate_road_profile(
     points = []
     
     for t in times_path:
-        x = target_speed * t
+        x = target_speed * t + start_length_margin
         if t < t_start:
             y = 0.0
         elif t > t_start + t_duration:
@@ -128,7 +128,7 @@ def generate_road_profile(
             dS_dtau = 140.0 * (tau**3) - 420.0 * (tau**4) + 420.0 * (tau**5) - 140.0 * (tau**6)
             dy_dt_t = (width / t_duration) * dS_dtau
             phi_grid[i] = np.arctan2(dy_dt_t, target_speed)
-        x_ref[i] = target_speed * t
+        x_ref[i] = target_speed * t + start_length_margin
 
     # 4. Roughness parameters (ISO 8608 Classes A to E)
     roughness_coefficients = {
