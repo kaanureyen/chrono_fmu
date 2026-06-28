@@ -19,7 +19,7 @@ def generate_road_profile(
     width=5.0,
     start_length_margin=20.0,  # extra terrain generated before spawn point
     end_length_margin=50.0,    # extra terrain generated after end of run
-    mesh_resolution=0.25,      # grid resolution (du, dv)
+    mesh_resolution=0.06,      # grid resolution (du, dv)
     v_width=8.0,
     iso_class='C',
     generate_obj=True,
@@ -234,7 +234,7 @@ if __name__ == "__main__":
         width=5.0,
         start_length_margin=20.0,
         end_length_margin=50.0,
-        mesh_resolution=0.25,
+        mesh_resolution=0.06,
         v_width=8.0,
         iso_class='C',
         generate_obj=GENERATE_OBJ
