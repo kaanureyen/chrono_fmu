@@ -19,6 +19,7 @@ set(FMU_MSG_PREFIX "   - ")
 add_custom_target(stage_driver_resources ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory "${COMPONENT_RESOURCES_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/generated/default_lane_change_path.txt" "${COMPONENT_RESOURCES_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/generated/speed_profile.txt" "${COMPONENT_RESOURCES_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CHRONO_DATA_DIR}/fonts" "${COMPONENT_RESOURCES_DIR}/fonts"
     COMMENT "Staging Driver FMU resources at build time..."
 )

@@ -99,6 +99,8 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     init_loc = VNULL;
     init_yaw = 0;
+    init_roll = 0;
+    init_pitch = 0;
 
     // Get default path file (relative to FMU resources at runtime)
     resources_dir = std::string(fmuResourceLocation).erase(0, 8);
@@ -162,6 +164,10 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     AddFmuVecVariable(init_loc, "init_loc", "m", "location of first path point",                                //
                       FmuVariable::CausalityType::output, FmuVariable::VariabilityType::constant);              //
     AddFmuVariable(&init_yaw, "init_yaw", FmuVariable::Type::Real, "rad", "orientation of first path segment",  //
+                   FmuVariable::CausalityType::output, FmuVariable::VariabilityType::constant);                 //
+    AddFmuVariable(&init_roll, "init_roll", FmuVariable::Type::Real, "rad", "roll of first path segment",        //
+                   FmuVariable::CausalityType::output, FmuVariable::VariabilityType::constant);                 //
+    AddFmuVariable(&init_pitch, "init_pitch", FmuVariable::Type::Real, "rad", "pitch of first path segment",     //
                    FmuVariable::CausalityType::output, FmuVariable::VariabilityType::constant);                 //
 
     // Set CONTINOUS INPUTS for this FMU
@@ -252,10 +258,16 @@ void FmuComponent::CreateDriver() {
     auto point0 = path->GetPoint(0);
     auto point1 = path->GetPoint(1);
     init_loc = point0;
-    init_yaw = std::atan2(point1.y() - point0.y(), point1.x() - point0.x());
+    
+    double dx = point1.x() - point0.x();
+    double dy = point1.y() - point0.y();
+    double dz = point1.z() - point0.z();
+    init_yaw = std::atan2(dy, dx);
+    init_pitch = -std::atan2(dz, std::sqrt(dx*dx + dy*dy));
+    init_roll = 0.0;
 
     ref_frame.SetPos(init_loc);
-    ref_frame.SetRot(QuatFromAngleZ(init_yaw));
+    ref_frame.SetRot(QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll));
 
 #ifdef CHRONO_IRRLICHT
     auto ground = chrono_types::make_shared<ChBody>();
@@ -345,7 +357,7 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
         int grid_x = (int)std::ceil(path_aabb.Size().x() / spacing);
         int grid_y = 2 * (int)std::ceil(path_aabb.Size().y() / spacing);
         auto grid_pos = path_aabb.Center() - ChVector3d(0, 0, 0.05);
-        auto grid_rot = QuatFromAngleZ(init_yaw);
+        auto grid_rot = QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll);
 
         // Create run-time visualization system
         vis_sys->SetLogLevel(irr::ELL_NONE);
@@ -377,7 +389,7 @@ fmi2Status FmuComponent::doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real
         reset = fmi2False;
         m_time = currentCommunicationPoint;
         ref_frame.SetPos(init_loc);
-        ref_frame.SetRot(QuatFromAngleZ(init_yaw));
+        ref_frame.SetRot(QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll));
         ref_frame.SetPosDt(ChVector3d(0, 0, 0));
         ref_frame.SetRotDt(ChQuaternion<>(1, 0, 0, 0));
         speedPID->Reset(ref_frame);

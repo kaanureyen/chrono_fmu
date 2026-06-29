@@ -66,8 +66,10 @@ int main(int argc, char* argv[]) {
     vector<double> phi_grid(Nu);
     vector<double> x_ref(Nu);
     vector<double> y_ref(Nu);
+    vector<double> slope_grid(Nu);
+    vector<double> banking_grid(Nu);
     for (int i = 0; i < Nu; ++i) {
-        if (!(infile >> phi_grid[i] >> x_ref[i] >> y_ref[i])) {
+        if (!(infile >> phi_grid[i] >> x_ref[i] >> y_ref[i] >> slope_grid[i] >> banking_grid[i])) {
             cerr << "Error reading reference line at index " << i << endl;
             return 1;
         }
@@ -84,6 +86,11 @@ int main(int argc, char* argv[]) {
         }
     }
     infile.close();
+
+    vector<double> z_ref(Nu, 0.0);
+    for (int i = 1; i < Nu; ++i) {
+        z_ref[i] = z_ref[i - 1] + du * slope_grid[i - 1];
+    }
     
     cout << "Read inputs successfully. Nu=" << Nu << ", Nv=" << Nv << ", N_waves=" << N_waves << endl;
     
@@ -125,8 +132,12 @@ int main(int argc, char* argv[]) {
             double phi = phi_grid[i];
             double xr = x_ref[i];
             double yr = y_ref[i];
+            double slope = slope_grid[i];
+            double banking = banking_grid[i];
             double sin_phi = sin(phi);
             double cos_phi = cos(phi);
+            double cos_bank = sqrt(1.0 - banking * banking);
+            double sin_bank = banking;
             
             local_buffer.clear();
             
@@ -138,14 +149,14 @@ int main(int argc, char* argv[]) {
             local_buffer.append(val_buf);
             col_in_line++;
             
-            // 2. Format slope = 0.0
-            sprintf(val_buf, "%10.7f", 0.0);
+            // 2. Format slope
+            sprintf(val_buf, "%10.7f", slope);
             local_buffer.append(val_buf);
             col_in_line++;
             if (col_in_line == 8) { local_buffer.append("\n"); col_in_line = 0; }
             
-            // 3. Format banking = 0.0
-            sprintf(val_buf, "%10.7f", 0.0);
+            // 3. Format banking
+            sprintf(val_buf, "%10.7f", banking);
             local_buffer.append(val_buf);
             col_in_line++;
             if (col_in_line == 8) { local_buffer.append("\n"); col_in_line = 0; }
@@ -153,8 +164,9 @@ int main(int argc, char* argv[]) {
             // 4. Format Nv elevations using AVX2-accelerated math
             for (int j = 0; j < Nv; ++j) {
                 double v = v_grid[j];
-                double x = xr - v * sin_phi;
-                double y = yr + v * cos_phi;
+                double x = xr - v * cos_bank * sin_phi;
+                double y = yr + v * cos_bank * cos_phi;
+                double z_bank = v * sin_bank;
                 
                 __m256 sum_vec = _mm256_setzero_ps();
                 __m256 x_vec = _mm256_set1_ps((float)x);
@@ -180,11 +192,13 @@ int main(int argc, char* argv[]) {
                 sum128 = _mm_hadd_ps(sum128, sum128);
                 float total_z = _mm_cvtss_f32(sum128);
                 
+                float final_z = (float)(z_ref[i] + z_bank + total_z);
+                
                 grid_x[i * Nv + j] = (float)x;
                 grid_y[i * Nv + j] = (float)y;
-                grid_z[i * Nv + j] = total_z;
+                grid_z[i * Nv + j] = final_z;
                 
-                sprintf(val_buf, "%10.7f", total_z);
+                sprintf(val_buf, "%10.7f", (double)final_z);
                 local_buffer.append(val_buf);
                 
                 col_in_line++;

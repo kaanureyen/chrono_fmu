@@ -110,6 +110,8 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
 
     chrono::ChVector3d init_loc;  ///< location of first path point (FMU constant output)
     double init_yaw;              ///< orientation of first path segment (FMU constant output)
+    double init_roll;             ///< roll of first path segment (FMU constant output)
+    double init_pitch;            ///< pitch of first path segment (FMU constant output)
 
     // FMU I/O parameters
     std::string out_path;  ///< output directory

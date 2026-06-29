@@ -139,7 +139,9 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     double terrain_friction;                   ///< terrain coefficient of friction
     fmi2Boolean system_SMC;                    ///< use SMC contact formulation (NSC otherwise)
     chrono::ChVector3d init_loc;               ///< initial vehicle location
-    double init_yaw;                           ///< initial vehicle orientation
+    double init_yaw;                           ///< initial vehicle orientation (yaw)
+    double init_roll;                          ///< initial vehicle roll
+    double init_pitch;                         ///< initial vehicle pitch
     double init_vel;                           ///< initial vehicle forward velocity
     chrono::ChVector3d g_acc;                  ///< gravitational acceleration
     double step_size;                          ///< integration step size

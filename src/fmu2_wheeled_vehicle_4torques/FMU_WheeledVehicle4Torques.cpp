@@ -124,6 +124,8 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     driver_inputs = {0, 0, 0, 0};
     init_loc = {0, 0, 0};
     init_yaw = 0;
+    init_roll = 0;
+    init_pitch = 0;
     init_vel = 22.2222; // Default to 80 kph (22.2222 m/s)
 
     torque_FL = 0;
@@ -199,7 +201,11 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     AddFmuVecVariable(init_loc, "init_loc", "m", "initial location",                                //
                       FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);  //
-    AddFmuVariable(&init_yaw, "init_yaw", FmuVariable::Type::Real, "rad", "initial location Z",     //
+    AddFmuVariable(&init_yaw, "init_yaw", FmuVariable::Type::Real, "rad", "initial yaw",            //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
+    AddFmuVariable(&init_roll, "init_roll", FmuVariable::Type::Real, "rad", "initial roll",         //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
+    AddFmuVariable(&init_pitch, "init_pitch", FmuVariable::Type::Real, "rad", "initial pitch",      //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);     //
 
     AddFmuVecVariable(g_acc, "g_acc", "m/s2", "gravitational acceleration",                         //
@@ -309,18 +315,18 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     }
 
     // Specify variable dependencies
-    DeclareVariableDependencies("ref_frame", {"init_loc", "init_yaw"});
+    DeclareVariableDependencies("ref_frame", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
     for (int iw = 0; iw < 4; iw++) {
         std::string prefix = "wheel_" + wheel_data[iw].identifier;
-        DeclareVariableDependencies(prefix + ".pos", {"init_loc", "init_yaw"});
-        DeclareVariableDependencies(prefix + ".rot", {"init_loc", "init_yaw"});
-        DeclareVariableDependencies(prefix + ".force", {"init_loc", "init_yaw"});
-        DeclareVariableDependencies(prefix + ".slip_angle", {"init_loc", "init_yaw"});
-        DeclareVariableDependencies(prefix + ".slip_ratio", {"init_loc", "init_yaw"});
+        DeclareVariableDependencies(prefix + ".pos", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
+        DeclareVariableDependencies(prefix + ".rot", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
+        DeclareVariableDependencies(prefix + ".force", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
+        DeclareVariableDependencies(prefix + ".slip_angle", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
+        DeclareVariableDependencies(prefix + ".slip_ratio", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
 
         std::string susp_prefix = "susp_" + wheel_data[iw].identifier;
-        DeclareVariableDependencies(susp_prefix + ".travel", {"init_loc", "init_yaw"});
-        DeclareVariableDependencies(susp_prefix + ".velocity", {"init_loc", "init_yaw"});
+        DeclareVariableDependencies(susp_prefix + ".travel", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
+        DeclareVariableDependencies(susp_prefix + ".velocity", {"init_loc", "init_yaw", "init_roll", "init_pitch"});
     }
 
     // Specify functions to process input variables (at beginning of step)
@@ -370,6 +376,8 @@ void FmuComponent::CreateVehicle() {
     std::cout << " Vehicle JSON:      " << resolved_vehicle_JSON << std::endl;
     std::cout << " Initial location:  " << init_loc << std::endl;
     std::cout << " Initial yaw:       " << init_yaw << std::endl;
+    std::cout << " Initial roll:      " << init_roll << std::endl;
+    std::cout << " Initial pitch:     " << init_pitch << std::endl;
     std::cout << " Initial velocity:  " << init_vel << std::endl;
 
     std::cout << "[FMU] Current working directory: " << std::filesystem::current_path().string() << std::endl;
@@ -379,7 +387,10 @@ void FmuComponent::CreateVehicle() {
     // Create the vehicle system
     vehicle = chrono_types::make_shared<WheeledVehicle>(resolved_vehicle_JSON, system_SMC ? ChContactMethod::SMC : ChContactMethod::NSC);
     std::cout << "[DEBUG] Vehicle created. Initializing..." << std::endl;
-    vehicle->Initialize(ChCoordsys<>(init_loc + ChVector3d(0, 0, 0.5), QuatFromAngleZ(init_yaw)), init_vel);
+    
+    ChQuaterniond init_rot = QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll);
+    ChVector3d init_offset = init_rot.Rotate(ChVector3d(0, 0, 0.5));
+    vehicle->Initialize(ChCoordsys<>(init_loc + init_offset, init_rot), init_vel);
     std::cout << "[DEBUG] Vehicle initialized." << std::endl;
 
     // Initialize the vehicle reference frame
@@ -689,7 +700,8 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
         vis_sys->SetWindowSize(800, 800);
         vis_sys->SetChaseCamera(ChVector3d(0.0, 0.0, 1.75), 6.0, 0.5);
         vis_sys->SetBackgroundColor(ChColor(0.37f, 0.50f, 0.60f));
-        vis_sys->AddGrid(0.5, 0.5, 2000, 400, ChCoordsys<>(init_loc, QuatFromAngleZ(init_yaw)), ChColor(0.31f, 0.43f, 0.43f));
+        ChQuaterniond init_rot = QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll);
+        vis_sys->AddGrid(0.5, 0.5, 2000, 400, ChCoordsys<>(init_loc, init_rot), ChColor(0.31f, 0.43f, 0.43f));
         vis_sys->Initialize();
         vis_sys->AddLightDirectional();
         vis_sys->AttachVehicle(vehicle.get());
@@ -704,7 +716,9 @@ fmi2Status FmuComponent::doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real
         reset = fmi2False;
         m_time = currentCommunicationPoint;
         vehicle->GetSystem()->SetChTime(currentCommunicationPoint);
-        vehicle->Initialize(ChCoordsys<>(init_loc + ChVector3d(0, 0, 0.5), QuatFromAngleZ(init_yaw)), init_vel);
+        ChQuaterniond init_rot = QuatFromAngleZ(init_yaw) * QuatFromAngleY(init_pitch) * QuatFromAngleX(init_roll);
+        ChVector3d init_offset = init_rot.Rotate(ChVector3d(0, 0, 0.5));
+        vehicle->Initialize(ChCoordsys<>(init_loc + init_offset, init_rot), init_vel);
         for (int i = 0; i < 4; i++) {
             tires[i]->Initialize(wheel_data[i].wheel);
         }

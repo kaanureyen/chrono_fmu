@@ -230,6 +230,8 @@ void RunSimulation(const std::string& vehicle_fmu_filename, const std::string& v
     {
         vehicle_fmu.SetVecVariable("init_loc", init_loc);
         vehicle_fmu.SetVariable("init_yaw", 0.0, FmuVariable::Type::Real);
+        vehicle_fmu.SetVariable("init_roll", 0.0, FmuVariable::Type::Real);
+        vehicle_fmu.SetVariable("init_pitch", 0.0, FmuVariable::Type::Real);
 
         // Pass relative path directly; the FMU will resolve it internally relative to its resources directory
         std::cout << "Configuring tire JSON: " << tire_JSON_rel << std::endl;

@@ -16,4 +16,3 @@ pushd "%DEMO_DIR%"
 popd
 
 echo.
-pause
