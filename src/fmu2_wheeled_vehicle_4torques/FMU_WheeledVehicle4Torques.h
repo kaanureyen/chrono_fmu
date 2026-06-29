@@ -66,7 +66,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
                  const fmi2CallbackFunctions* functions,
                  fmi2Boolean visible,
                  fmi2Boolean loggingOn);
-    ~FmuComponent() {}
+    ~FmuComponent();
 
     /// Advance dynamics.
     virtual fmi2Status doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real communicationStepSize, fmi2Boolean noSetFMUStatePriorToCurrentPoint) override;
@@ -85,17 +85,20 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     /// This function is invoked in exitInitializationModeIMPL(), once FMU parameters are set.
     void CreateVehicle();
 
-    /// Configure the underlying Chrono system.
+    /// Configure the vehicle system (tires, terrain, contact formulation).
     /// This function is invoked in exitInitializationModeIMPL(), once FMU parameters are set.
     void ConfigureSystem();
 
-    /// Update vehicle system with current FMU continuous inputs.
+    /// Synchronize the vehicle system with current FMU inputs.
     /// This function is called before advancing dynamics of the vehicle.
     void SynchronizeVehicle(double time);
 
-    /// Extract FMU continuous outputs from the vehicle system.
+    /// Extract FMU outputs from the vehicle system.
     /// This function is called after advancing dynamics of the vehicle.
     void CalculateVehicleOutputs();
+
+    /// Functor class to set terrain friction coefficient.
+    std::shared_ptr<VehicleFrictionFunctor> friction_functor;
 
     /// Exchange data for vehicle wheels.
     struct WheelData {
@@ -107,14 +110,14 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
 
     std::shared_ptr<chrono::vehicle::WheeledVehicle> vehicle;  ///< underlying wheeled vehicle
 
-#ifdef CHRONO_IRRLICHT
-    std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> vis_sys;
-#endif
-
     // Internal subsystems (embedded tires and terrain)
     std::array<std::shared_ptr<chrono::vehicle::ChTire>, 4> tires;
     std::shared_ptr<chrono::vehicle::ChTerrain> terrain;
     chrono::vehicle::TerrainForces terrain_forces;
+
+#ifdef CHRONO_IRRLICHT
+    std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> vis_sys;
+#endif
 
     // FMU I/O parameters
     std::string out_path;  ///< output directory

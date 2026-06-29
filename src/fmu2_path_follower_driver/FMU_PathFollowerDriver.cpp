@@ -34,6 +34,10 @@
 
 #include "FMU_PathFollowerDriver.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using namespace chrono;
 using namespace chrono::vehicle;
 using namespace chrono::fmi2;
@@ -188,6 +192,25 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     // Specify functions to calculate FMU outputs (at end of step)
     AddPostStepFunction([this]() { this->CalculateDriverOutputs(); });
+}
+
+FmuComponent::~FmuComponent() {
+#ifdef CHRONO_IRRLICHT
+    if (vis_sys) {
+        auto device = vis_sys->GetDevice();
+        if (device) {
+            device->closeDevice();
+        }
+        vis_sys.reset();
+    }
+#ifdef _WIN32
+    MSG msg;
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+#endif
+#endif
 }
 
 void FmuComponent::CreateDriver() {

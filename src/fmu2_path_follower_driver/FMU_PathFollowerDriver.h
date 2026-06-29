@@ -58,7 +58,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
                  const fmi2CallbackFunctions* functions,
                  fmi2Boolean visible,
                  fmi2Boolean loggingOn);
-    ~FmuComponent() {}
+    ~FmuComponent();
 
     /// Advance dynamics.
     virtual fmi2Status doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real communicationStepSize, fmi2Boolean noSetFMUStatePriorToCurrentPoint) override;

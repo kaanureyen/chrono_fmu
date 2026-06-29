@@ -37,6 +37,10 @@
 
 #include "FMU_WheeledVehicle4Torques.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef CHRONO_HAS_OPENCRG
 #include "chrono_vehicle/terrain/CRGTerrain.h"
 #endif
@@ -324,6 +328,25 @@ FmuComponent::FmuComponent(fmi2String instanceName,
 
     // Specify functions to calculate FMU outputs (at end of step)
     AddPostStepFunction([this]() { this->CalculateVehicleOutputs(); });
+}
+
+FmuComponent::~FmuComponent() {
+#ifdef CHRONO_IRRLICHT
+    if (vis_sys) {
+        auto device = vis_sys->GetDevice();
+        if (device) {
+            device->closeDevice();
+        }
+        vis_sys.reset();
+    }
+#ifdef _WIN32
+    MSG msg;
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+#endif
+#endif
 }
 
 void FmuComponent::CreateVehicle() {
