@@ -117,24 +117,31 @@ if not exist "%EIGEN3_INCLUDE_DIR%" (
     echo Eigen 3.4.0 is already present.
 )
 
+:: Replace backslashes with forward slashes for CMake path variables
+set "SRC_DIR_FWD=%SRC_DIR:\=/%"
+set "BUILD_DIR_FWD=%BUILD_DIR:\=/%"
+set "IRRLICHT_ROOT_FWD=%IRRLICHT_ROOT:\=/%"
+set "OPENCRG_DIR_FWD=%OPENCRG_DIR:\=/%"
+set "EIGEN3_INCLUDE_DIR_FWD=%EIGEN3_INCLUDE_DIR:\=/%"
+
 :: -----------------------------------------------------------------------------
 :: Step 3: Configure and Build core Chrono with Ninja
 :: -----------------------------------------------------------------------------
 echo Configuring Chrono with Ninja...
-cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" -G Ninja ^
+cmake -S "%SRC_DIR_FWD%" -B "%BUILD_DIR_FWD%" -G Ninja ^
   -DCMAKE_BUILD_TYPE=Release ^
   -DCH_ENABLE_MODULE_FMI=ON ^
   -DCH_ENABLE_MODULE_VEHICLE=ON ^
   -DCH_ENABLE_MODULE_IRRLICHT=ON ^
-  -DIrrlicht_ROOT="%IRRLICHT_ROOT%" ^
+  -DIrrlicht_ROOT="%IRRLICHT_ROOT_FWD%" ^
   -DCH_ENABLE_OPENCRG=ON ^
-  -DOpenCRG_INCLUDE_DIR="%OPENCRG_DIR%\include" ^
-  -DOpenCRG_LIBRARY="%OPENCRG_DIR%\lib\OpenCRG.lib" ^
-  -DEIGEN3_INCLUDE_DIR="%EIGEN3_INCLUDE_DIR%" ^
+  -DOpenCRG_INCLUDE_DIR="%OPENCRG_DIR_FWD%/include" ^
+  -DOpenCRG_LIBRARY="%OPENCRG_DIR_FWD%/lib/OpenCRG.lib" ^
+  -DEIGEN3_INCLUDE_DIR="%EIGEN3_INCLUDE_DIR_FWD%" ^
   -DBUILD_DEMOS=OFF ^
   -DBUILD_TESTING=OFF ^
   -DBUILD_SHARED_LIBS=OFF ^
   -DCH_USE_MSVC_STATIC_RUNTIME=ON || exit /b 1
 
 echo Building Chrono...
-cmake --build "%BUILD_DIR%" --config Release -j || exit /b 1
+cmake --build "%BUILD_DIR_FWD%" --config Release -j || exit /b 1
