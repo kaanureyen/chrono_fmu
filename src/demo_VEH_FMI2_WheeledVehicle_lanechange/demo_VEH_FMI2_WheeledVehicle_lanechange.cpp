@@ -106,6 +106,7 @@ int main(int argc, char* argv[]) {
     double stop_time = 10.0;
     double fps = 30.0;         // Default to 30 FPS rendering frame rate
     int terrain_type = 2;      // Default: 2 (OpenCRG), 1 (OBJ Mesh)
+    bool terrain_crg_simplify = true; // Default: true (enabled)
     bool stop_time_overridden = false;
 
     for (int i = 1; i < argc; ++i) {
@@ -151,6 +152,8 @@ int main(int argc, char* argv[]) {
             fps = std::stod(argv[++i]);
         } else if (arg == "--terrain" && i + 1 < argc) {
             terrain_type = std::stoi(argv[++i]);
+        } else if (arg == "--simplify_crg" && i + 1 < argc) {
+            terrain_crg_simplify = (std::stoi(argv[++i]) != 0);
         }
     }
 
@@ -442,6 +445,7 @@ int main(int argc, char* argv[]) {
                 vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"), FmuVariable::Type::String);
             }
         }
+        vehicle_fmu.SetVariable("terrain_crg_simplify", terrain_crg_simplify, FmuVariable::Type::Boolean);
         vehicle_fmu.SetVariable("tire_coll_type", tire_coll_type, FmuVariable::Type::Integer);
         vehicle_fmu.SetVariable("step_size", step_size, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("fps", fps, FmuVariable::Type::Real);

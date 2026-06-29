@@ -136,6 +136,7 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     int tire_coll_type;                        ///< tire collision type (0: single, 1: four points, 2: envelope)
     std::string terrain_mesh_file;             ///< OBJ road surface mesh file (for terrain_type = 1)
     std::string terrain_crg_file;              ///< OpenCRG road file (.crg) (for terrain_type = 2)
+    fmi2Boolean terrain_crg_simplify;          ///< simplify OpenCRG visualization mesh
     double terrain_friction;                   ///< terrain coefficient of friction
     fmi2Boolean system_SMC;                    ///< use SMC contact formulation (NSC otherwise)
     chrono::ChVector3d init_loc;               ///< initial vehicle location

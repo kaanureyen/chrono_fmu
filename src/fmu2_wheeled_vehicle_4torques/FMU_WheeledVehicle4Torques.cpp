@@ -159,6 +159,7 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     tire_coll_type = 2; // Default to 2D Profile Envelope
     terrain_mesh_file = "";
     terrain_crg_file = "default_road.crg";
+    terrain_crg_simplify = true;
     terrain_friction = 0.8;
 
     friction_FL = 0.8;
@@ -191,6 +192,9 @@ FmuComponent::FmuComponent(fmi2String instanceName,
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
 
     AddFmuVariable(&terrain_crg_file, "terrain_crg_file", FmuVariable::Type::String, "1", "terrain CRG file (.crg)",         //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
+
+    AddFmuVariable(&terrain_crg_simplify, "terrain_crg_simplify", FmuVariable::Type::Boolean, "1", "simplify OpenCRG visualization mesh", //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
 
     AddFmuVariable(&terrain_friction, "terrain_friction", FmuVariable::Type::Real, "1", "terrain friction",  //
@@ -442,7 +446,7 @@ void FmuComponent::CreateVehicle() {
         std::cout << "[FMU] Terrain CRG file status: " << (std::filesystem::exists(resolved_crg_file) ? "FOUND" : "NOT FOUND") << std::endl;
         auto crg_terrain = chrono_types::make_shared<CRGTerrain>(vehicle->GetSystem());
         crg_terrain->SetContactFrictionCoefficient(static_cast<float>(terrain_friction));
-        crg_terrain->SimplifyMesh(true);
+        crg_terrain->SimplifyMesh(terrain_crg_simplify);
         crg_terrain->Initialize(resolved_crg_file);
         terrain = crg_terrain;
         std::cout << "Configured CRGTerrain file: " << resolved_crg_file << std::endl;
