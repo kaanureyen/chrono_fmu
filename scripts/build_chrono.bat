@@ -18,6 +18,10 @@ if "%SRC_DIR%"=="" set "SRC_DIR=%SCRATCH_DIR%\chrono"
 if "%BUILD_DIR%"=="" set "BUILD_DIR=%SCRATCH_DIR%\chrono_build"
 if "%IRRLICHT_ROOT%"=="" set "IRRLICHT_ROOT=%SCRATCH_DIR%\packages\irrlicht-1.8.5"
 if "%OPENCRG_DIR%"=="" set "OPENCRG_DIR=%SCRATCH_DIR%\packages\openCRG"
+if "%DOWNLOAD_DIR%"=="" set "DOWNLOAD_DIR=%SCRATCH_DIR%\chrono_fmus\build\download_crg"
+if "%BUILD_CRG_DIR%"=="" set "BUILD_CRG_DIR=%SCRATCH_DIR%\chrono_fmus\build\build_crg"
+if "%CRG_SRC_DIR%"=="" set "CRG_SRC_DIR=%DOWNLOAD_DIR%\opencrg-1.1.2"
+if "%EIGEN3_INCLUDE_DIR%"=="" set "EIGEN3_INCLUDE_DIR=%SCRATCH_DIR%\packages\eigen-3.4.0"
 
 if not defined DevEnvDir (
     call "%VS_PATH%\VC\Auxiliary\Build\vcvarsall.bat" amd64 || exit /b 1
@@ -47,9 +51,6 @@ if not exist "%OPENCRG_DIR%" (
     echo OpenCRG not found. Downloading and compiling...
     if not exist "%SCRATCH_DIR%\chrono_fmus\build" mkdir "%SCRATCH_DIR%\chrono_fmus\build"
     
-    set "DOWNLOAD_DIR=%SCRATCH_DIR%\chrono_fmus\build\download_crg"
-    set "BUILD_CRG_DIR=%SCRATCH_DIR%\chrono_fmus\build\build_crg"
-    
     if exist "%DOWNLOAD_DIR%" rmdir /s /q "%DOWNLOAD_DIR%"
     if exist "%BUILD_CRG_DIR%" rmdir /s /q "%BUILD_CRG_DIR%"
     
@@ -58,8 +59,6 @@ if not exist "%OPENCRG_DIR%" (
     
     powershell -Command "Write-Host 'Downloading OpenCRG 1.1.2...'; Invoke-WebRequest -UserAgent 'Wget' -Uri 'https://github.com/hlrs-vis/opencrg/archive/refs/tags/v1.1.2.zip' -OutFile '%DOWNLOAD_DIR%\crg.zip'" || exit /b 1
     powershell -Command "Write-Host 'Extracting OpenCRG...'; Expand-Archive -Force '%DOWNLOAD_DIR%\crg.zip' '%DOWNLOAD_DIR%'" || exit /b 1
-    
-    set "CRG_SRC_DIR=%DOWNLOAD_DIR%\opencrg-1.1.2"
     
     echo Compiling OpenCRG with static runtime...
     pushd "%BUILD_CRG_DIR%"
@@ -102,6 +101,23 @@ if not exist "%OPENCRG_DIR%" (
 )
 
 :: -----------------------------------------------------------------------------
+:: Step 2.5: Download & Install Eigen 3.4.0 if missing
+:: -----------------------------------------------------------------------------
+if not exist "%EIGEN3_INCLUDE_DIR%" (
+    echo Eigen 3.4.0 not found. Downloading and extracting...
+    if not exist "%SCRATCH_DIR%\packages" mkdir "%SCRATCH_DIR%\packages"
+    
+    powershell -Command "Write-Host 'Downloading Eigen 3.4.0...'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UserAgent 'Wget' -Uri 'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip' -OutFile '%SCRATCH_DIR%\packages\eigen-3.4.0.zip'" || exit /b 1
+    
+    powershell -Command "Write-Host 'Extracting Eigen 3.4.0...'; Expand-Archive -Path '%SCRATCH_DIR%\packages\eigen-3.4.0.zip' -DestinationPath '%SCRATCH_DIR%\packages' -Force" || exit /b 1
+    
+    del /f /q "%SCRATCH_DIR%\packages\eigen-3.4.0.zip"
+    echo Eigen 3.4.0 installed successfully.
+) else (
+    echo Eigen 3.4.0 is already present.
+)
+
+:: -----------------------------------------------------------------------------
 :: Step 3: Configure and Build core Chrono with Ninja
 :: -----------------------------------------------------------------------------
 echo Configuring Chrono with Ninja...
@@ -114,6 +130,7 @@ cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" -G Ninja ^
   -DCH_ENABLE_OPENCRG=ON ^
   -DOpenCRG_INCLUDE_DIR="%OPENCRG_DIR%\include" ^
   -DOpenCRG_LIBRARY="%OPENCRG_DIR%\lib\OpenCRG.lib" ^
+  -DEIGEN3_INCLUDE_DIR="%EIGEN3_INCLUDE_DIR%" ^
   -DBUILD_DEMOS=OFF ^
   -DBUILD_TESTING=OFF ^
   -DBUILD_SHARED_LIBS=OFF ^
