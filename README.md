@@ -13,8 +13,8 @@ This repository contains custom FMI 2.0 Co-Simulation Functional Mock-up Units (
   * `demo_VEH_FMI2_WheeledVehicle_lanechange/`: Co-simulation Stanley lateral path-following lane change demo.
   * `road_generator/`: Road profiling and path coordinates generator C++ utility and Python coordinator.
 * **`docs/`**: Documentation directory subdivided by topic:
-  * `docs/software/`: Software guidelines (installation, directory structure, Simulink co-simulation guide, parameter sweeps).
-  * `docs/theoretical/`: Mathematical modeling reports (KPI calculations, vehicle parameters guide, Bezier spline paths).
+  * `docs/software/`: Software guidelines (installation, directory structure).
+  * `docs/theoretical/`: Mathematical modeling reports (KPI calculations, vehicle parameters guide).
 * **`scripts/`**: Relative-path batch scripts to automate core Chrono bootstrapping, FMU builds, and cosim runs.
 * **`parameter_sweep.py`**: Parameter sweep grid utility to optimize driver tracking gains.
 * **`road_generator_gui.py`**: Tkinter GUI wizard to customize and generate road/path profiles interactively.
@@ -31,19 +31,19 @@ Models a 4-wheel vehicle chassis with double wishbone suspension, accepting inde
   * `tire_JSON`: Tire model description file (.json)
   * `terrain_type`: Type of road (0: Flat, 1: OBJ mesh, 2: OpenCRG)
   * `terrain_mesh_file` / `terrain_crg_file`: Terrain geometry files
-  * `terrain_friction`: Friction coefficient
   * `init_loc` / `init_yaw`: Starting location and heading
   * `step_size`: Solver integration time step
 * **Inputs (Variability: Continuous):**
   * `steering` / `braking`: Normalized control inputs `[-1.0, 1.0]` / `[0.0, 1.0]`
   * `torque_FL`, `torque_FR`, `torque_RL`, `torque_RR`: Axle motor torques (`Nm`)
   * `act_force_FL`, `act_force_FR`, `act_force_RL`, `act_force_RR`: Active suspension vertical forces (`N`)
+  * `friction_FL`, `friction_FR`, `friction_RL`, `friction_RR`: Wheel-terrain friction coefficients (`1`)
 * **Outputs (Variability: Continuous):**
   * `ref_frame`: 6-DOF moving reference frame of the chassis (position, rotation, velocities, accelerations)
   * `wheel_<ID>.pos` / `wheel_<ID>.rot`: Position (`m`) and orientation quaternion (`1`) for each wheel
   * `wheel_<ID>.lin_vel` / `wheel_<ID>.ang_vel`: Linear (`m/s`) and angular (`rad/s`) velocities for each wheel
   * `wheel_<ID>.force`: 3D tire-road contact force vector (`N`) for wear and road-holding calculation
-  * `wheel_<ID>.slip_angle` / `wheel_<ID>.slip_ratio`: Tire side slip angle (\(\alpha\)) and longitudinal slip ratio (\(\kappa\))
+  * `wheel_<ID>.slip_angle` / `wheel_<ID>.slip_ratio`: Tire side slip angle ($\alpha$) and longitudinal slip ratio ($\kappa$)
   * `susp_<ID>.travel` / `susp_<ID>.velocity`: Suspension TSDA deflection (`m`) and stroke speed (`m/s`)
 
 ---

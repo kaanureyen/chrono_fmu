@@ -27,7 +27,7 @@ winget install --id Kitware.CMake --exact --version 3.31.6 --silent
 winget install --id Ninja-build.Ninja --exact --version 1.13.2 --silent
 
 # 5. Install Python 3 (Python 3.14.3 verified)
-winget install --id Python.Python.3.12 --silent
+winget install --id Python.Python.3.14 --silent
 ```
 
 *Note: Restart your terminal after installing the tools to update your environment `PATH` variables.*
@@ -53,9 +53,12 @@ cd chrono_workspace
 
 # 2. Clone Core Project Chrono (Locked to tag 10.0.0 for static FMI compatibility)
 git clone --branch 10.0.0 https://github.com/projectchrono/chrono.git chrono
+cd chrono
+git submodule update --init --recursive
+cd ..
 
 # 3. Clone the Custom FMUs Repository
-git clone <your-fmus-repo-url> chrono_fmus
+git clone https://github.com/kaanureyen/chrono_fmu.git chrono_fmus
 ```
 
 This guarantees the following workspace folder structure:
