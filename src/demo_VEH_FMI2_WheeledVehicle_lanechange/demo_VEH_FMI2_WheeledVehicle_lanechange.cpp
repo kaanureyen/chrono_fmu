@@ -39,6 +39,45 @@ struct SimulationParameters {
     double road_friction = 0.8;
 };
 
+struct SpeedProfilePoint {
+    double time;
+    double speed;
+};
+
+std::vector<SpeedProfilePoint> load_speed_profile(const std::string& filename) {
+    std::vector<SpeedProfilePoint> profile;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cout << "Info: Speed profile file not found: " << filename << std::endl;
+        return profile;
+    }
+    double t, v;
+    while (file >> t >> v) {
+        profile.push_back({t, v});
+    }
+    std::cout << "Successfully loaded speed profile with " << profile.size() << " points." << std::endl;
+    return profile;
+}
+
+double interpolate_speed(double t, const std::vector<SpeedProfilePoint>& profile) {
+    if (profile.empty()) return 0.0;
+    if (t <= profile.front().time) return profile.front().speed;
+    if (t >= profile.back().time) return profile.back().speed;
+    
+    // Linear interpolation
+    for (size_t i = 0; i < profile.size() - 1; ++i) {
+        if (t >= profile[i].time && t <= profile[i + 1].time) {
+            double t0 = profile[i].time;
+            double t1 = profile[i + 1].time;
+            double v0 = profile[i].speed;
+            double v1 = profile[i + 1].speed;
+            double factor = (t - t0) / (t1 - t0);
+            return v0 + factor * (v1 - v0);
+        }
+    }
+    return profile.back().speed;
+}
+
 // Helper function to parse t_end and road_friction_mu from simulation_parameters.m at runtime
 SimulationParameters load_simulation_parameters(const std::string& filename) {
     SimulationParameters params;
@@ -86,7 +125,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Chrono FMI2 Co-Simulation - Sedan Lane Change Demo\n" << std::endl;
 
     // Command-line parameters with defaults
-    bool visible = true;
+    bool vehicle_visible = true;
+    bool driver_visible = false;
     int steering_type = 1;      // Default to Stanley (1). 0 for PID.
     double Kp_steering = -1.0;
     double Ki_steering = -1.0;
@@ -102,19 +142,29 @@ int main(int argc, char* argv[]) {
     std::string path_file_arg = "";
     std::string terrain_crg_file_arg = "";
     std::string sim_params_arg = "";
+    std::string speed_profile_file_arg = "";
     int tire_coll_type = 2;    // Default: 2 (2D Profile Envelope)
     double stop_time = 10.0;
     double fps = 30.0;         // Default to 30 FPS rendering frame rate
     int terrain_type = 2;      // Default: 2 (OpenCRG), 1 (OBJ Mesh)
     bool terrain_crg_simplify = true; // Default: true (enabled)
+    std::string terrain_diffuse_texture = "";
+    std::string terrain_normal_texture = "";
+    bool terrain_show_visual_lines = false;
     bool stop_time_overridden = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--headless") {
-            visible = false;
+            vehicle_visible = false;
+            driver_visible = false;
         } else if (arg == "--visible") {
-            visible = true;
+            vehicle_visible = true;
+            driver_visible = true;
+        } else if (arg == "--vehicle_visible" && i + 1 < argc) {
+            vehicle_visible = (std::stoi(argv[++i]) != 0);
+        } else if (arg == "--driver_visible" && i + 1 < argc) {
+            driver_visible = (std::stoi(argv[++i]) != 0);
         } else if (arg == "--steering_type" && i + 1 < argc) {
             steering_type = std::stoi(argv[++i]);
         } else if (arg == "--Kp_steering" && i + 1 < argc) {
@@ -141,6 +191,8 @@ int main(int argc, char* argv[]) {
             path_file_arg = argv[++i];
         } else if (arg == "--terrain_crg_file" && i + 1 < argc) {
             terrain_crg_file_arg = argv[++i];
+        } else if (arg == "--speed_profile_file" && i + 1 < argc) {
+            speed_profile_file_arg = argv[++i];
         } else if (arg == "--stanley_dead_zone" && i + 1 < argc) {
             stanley_dead_zone = std::stod(argv[++i]);
         } else if (arg == "--tire_coll_type" && i + 1 < argc) {
@@ -154,6 +206,12 @@ int main(int argc, char* argv[]) {
             terrain_type = std::stoi(argv[++i]);
         } else if (arg == "--simplify_crg" && i + 1 < argc) {
             terrain_crg_simplify = (std::stoi(argv[++i]) != 0);
+        } else if (arg == "--terrain_diffuse_texture" && i + 1 < argc) {
+            terrain_diffuse_texture = argv[++i];
+        } else if (arg == "--terrain_normal_texture" && i + 1 < argc) {
+            terrain_normal_texture = argv[++i];
+        } else if (arg == "--terrain_show_visual_lines" && i + 1 < argc) {
+            terrain_show_visual_lines = (std::stoi(argv[++i]) != 0);
         }
     }
 
@@ -171,7 +229,8 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "Parameters:" << std::endl;
-    std::cout << "  visible:         " << (visible ? "true" : "false") << std::endl;
+    std::cout << "  vehicle_visible: " << (vehicle_visible ? "true" : "false") << std::endl;
+    std::cout << "  driver_visible:  " << (driver_visible ? "true" : "false") << std::endl;
     std::cout << "  steering_type:   " << (steering_type == 1 ? "1 (Stanley)" : "0 (PID)") << std::endl;
     std::cout << "  Kp_steering:     " << Kp_steering << std::endl;
     std::cout << "  Ki_steering:     " << Ki_steering << std::endl;
@@ -242,8 +301,6 @@ int main(int argc, char* argv[]) {
     std::cout << "Vehicle FMU path: " << vehicle_fmu_filename << std::endl;
     std::cout << "Driver FMU path:  " << driver_fmu_filename << std::endl;
 
-    FmuChronoUnit vehicle_fmu;
-    FmuChronoUnit driver_fmu;
     std::vector<std::string> logCategories = {"logAll"};
 
     std::filesystem::path build_dir = exe_dir.parent_path().parent_path();
@@ -269,9 +326,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    try {
-        vehicle_fmu.Load(fmi2Type::fmi2CoSimulation, vehicle_fmu_filename, vehicle_unpack_dir);
-        driver_fmu.Load(fmi2Type::fmi2CoSimulation, driver_fmu_filename, driver_unpack_dir);
+    // Start nested scope to control FMU DLL lifecycles and release file locks
+    {
+        FmuChronoUnit vehicle_fmu;
+        FmuChronoUnit driver_fmu;
+
+        try {
+            vehicle_fmu.Load(fmi2Type::fmi2CoSimulation, vehicle_fmu_filename, vehicle_unpack_dir);
+            driver_fmu.Load(fmi2Type::fmi2CoSimulation, driver_fmu_filename, driver_unpack_dir);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Failed to load FMUs: " << e.what() << std::endl;
         return 1;
@@ -285,6 +347,22 @@ int main(int argc, char* argv[]) {
         if (std::filesystem::exists(default_params)) {
             sim_params_arg = default_params.string();
         }
+    }
+
+    std::string speed_profile_file = "";
+    if (!speed_profile_file_arg.empty()) {
+        speed_profile_file = speed_profile_file_arg;
+    } else {
+        std::filesystem::path default_speed = build_dir / "generated" / "speed_profile.txt";
+        if (std::filesystem::exists(default_speed)) {
+            speed_profile_file = default_speed.string();
+        }
+    }
+
+    std::vector<SpeedProfilePoint> speed_profile;
+    if (!speed_profile_file.empty()) {
+        std::cout << "Loading speed profile: " << speed_profile_file << std::endl;
+        speed_profile = load_speed_profile(speed_profile_file);
     }
 
     if (!path_file_arg.empty()) {
@@ -301,6 +379,19 @@ int main(int argc, char* argv[]) {
             std::filesystem::copy_file(p_src, vehicle_resources_path / p_src.filename(), std::filesystem::copy_options::overwrite_existing);
         } else {
             std::cerr << "WARNING: Custom CRG file not found: " << terrain_crg_file_arg << std::endl;
+        }
+    }
+    // Copy the OBJ mesh file to unpacked vehicle resources if it exists
+    {
+        std::filesystem::path obj_src = "";
+        if (!terrain_crg_file_arg.empty()) {
+            obj_src = std::filesystem::path(terrain_crg_file_arg).parent_path() / "default_road.obj";
+        } else {
+            obj_src = build_dir / "generated" / "default_road.obj";
+        }
+        if (std::filesystem::exists(obj_src)) {
+            std::filesystem::copy_file(obj_src, vehicle_resources_path / "default_road.obj", std::filesystem::copy_options::overwrite_existing);
+            std::cout << "[FMU] Copied generated OBJ mesh to unpacked resources: " << obj_src.string() << std::endl;
         }
     }
     if (!sim_params_arg.empty()) {
@@ -351,8 +442,8 @@ int main(int argc, char* argv[]) {
 
     // Instantiate FMUs
     try {
-        vehicle_fmu.Instantiate("WheeledVehicle4TorquesFMU", false, visible);
-        driver_fmu.Instantiate("PathFollowerDriverFMU", false, visible);
+        vehicle_fmu.Instantiate("WheeledVehicle4TorquesFMU", false, vehicle_visible);
+        driver_fmu.Instantiate("PathFollowerDriverFMU", false, driver_visible);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Failed to instantiate FMUs: " << e.what() << std::endl;
         return 1;
@@ -385,11 +476,11 @@ int main(int argc, char* argv[]) {
 
     try {
         // Configure Driver FMU parameters
-        driver_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
+        driver_fmu.SetVariable("visible", driver_visible);
         if (!path_file_arg.empty()) {
-            driver_fmu.SetVariable("path_file", std::filesystem::path(path_file_arg).filename().string(), FmuVariable::Type::String);
+            driver_fmu.SetVariable("path_file", std::filesystem::path(path_file_arg).filename().string());
         } else {
-            driver_fmu.SetVariable("path_file", std::string("default_lane_change_path.txt"), FmuVariable::Type::String);
+            driver_fmu.SetVariable("path_file", std::string("default_lane_change_path.txt"));
         }
         driver_fmu.SetVariable("steering_type", steering_type, FmuVariable::Type::Integer);
         driver_fmu.SetVariable("Kp_steering", Kp_steering, FmuVariable::Type::Real);
@@ -429,7 +520,7 @@ int main(int argc, char* argv[]) {
         vehicle_fmu.SetVariable("friction_FR", road_friction, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("friction_RL", road_friction, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("friction_RR", road_friction, FmuVariable::Type::Real);
-        vehicle_fmu.SetVariable("visible", visible, FmuVariable::Type::Boolean);
+        vehicle_fmu.SetVariable("visible", vehicle_visible);
         vehicle_fmu.SetVecVariable("init_loc", init_loc);
         vehicle_fmu.SetVariable("init_yaw", init_yaw, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("init_roll", init_roll, FmuVariable::Type::Real);
@@ -440,12 +531,15 @@ int main(int argc, char* argv[]) {
             vehicle_fmu.SetVariable("terrain_mesh_file", std::string("default_road.obj"));
         } else {
             if (!terrain_crg_file_arg.empty()) {
-                vehicle_fmu.SetVariable("terrain_crg_file", std::filesystem::path(terrain_crg_file_arg).filename().string(), FmuVariable::Type::String);
+                vehicle_fmu.SetVariable("terrain_crg_file", std::filesystem::path(terrain_crg_file_arg).filename().string());
             } else {
-                vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"), FmuVariable::Type::String);
+                vehicle_fmu.SetVariable("terrain_crg_file", std::string("default_road.crg"));
             }
         }
-        vehicle_fmu.SetVariable("terrain_crg_simplify", terrain_crg_simplify, FmuVariable::Type::Boolean);
+        vehicle_fmu.SetVariable("terrain_crg_simplify", terrain_crg_simplify);
+        vehicle_fmu.SetVariable("terrain_diffuse_texture", terrain_diffuse_texture);
+        vehicle_fmu.SetVariable("terrain_normal_texture", terrain_normal_texture);
+        vehicle_fmu.SetVariable("terrain_show_visual_lines", terrain_show_visual_lines);
         vehicle_fmu.SetVariable("tire_coll_type", tire_coll_type, FmuVariable::Type::Integer);
         vehicle_fmu.SetVariable("step_size", step_size, FmuVariable::Type::Real);
         vehicle_fmu.SetVariable("fps", fps, FmuVariable::Type::Real);
@@ -476,7 +570,11 @@ int main(int argc, char* argv[]) {
         driver_fmu.SetFrameMovingVariable("ref_frame", ref_frame);
 
         // 2. Set target speed
-        driver_fmu.SetVariable("target_speed", init_vel, FmuVariable::Type::Real);
+        double target_speed_val = init_vel;
+        if (!speed_profile.empty()) {
+            target_speed_val = interpolate_speed(time, speed_profile);
+        }
+        driver_fmu.SetVariable("target_speed", target_speed_val, FmuVariable::Type::Real);
 
         // 3. Step driver FMU
         auto status_driver = driver_fmu.DoStep(time, step_size, fmi2True);
@@ -509,6 +607,13 @@ int main(int argc, char* argv[]) {
             break;
         }
 
+        // Retrieve suspension travel
+        double susp_trav_FL = 0, susp_trav_FR = 0, susp_trav_RL = 0, susp_trav_RR = 0;
+        vehicle_fmu.GetVariable("susp_FL.travel", susp_trav_FL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_FR.travel", susp_trav_FR, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_RL.travel", susp_trav_RL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("susp_RR.travel", susp_trav_RR, FmuVariable::Type::Real);
+
         // Retrieve suspension velocities
         double susp_vel_FL = 0, susp_vel_FR = 0, susp_vel_RL = 0, susp_vel_RR = 0;
         vehicle_fmu.GetVariable("susp_FL.velocity", susp_vel_FL, FmuVariable::Type::Real);
@@ -534,13 +639,38 @@ int main(int argc, char* argv[]) {
         vehicle_fmu.GetVariable("wheel_RR.force.y", tire_f_RR_y, FmuVariable::Type::Real);
         vehicle_fmu.GetVariable("wheel_RR.force.z", tire_f_RR_z, FmuVariable::Type::Real);
 
-        // 7. Write trajectory, suspension velocities, and tire forces to CSV
+        // Retrieve tire slip angles, slip ratios, and wheel angular speeds (omega)
+        double slip_ang_FL = 0, slip_ang_FR = 0, slip_ang_RL = 0, slip_ang_RR = 0;
+        double slip_rat_FL = 0, slip_rat_FR = 0, slip_rat_RL = 0, slip_rat_RR = 0;
+        double omega_FL = 0, omega_FR = 0, omega_RL = 0, omega_RR = 0;
+        vehicle_fmu.GetVariable("wheel_FL.slip_angle", slip_ang_FL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.slip_angle", slip_ang_FR, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.slip_angle", slip_ang_RL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.slip_angle", slip_ang_RR, FmuVariable::Type::Real);
+        
+        vehicle_fmu.GetVariable("wheel_FL.slip_ratio", slip_rat_FL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.slip_ratio", slip_rat_FR, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.slip_ratio", slip_rat_RL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.slip_ratio", slip_rat_RR, FmuVariable::Type::Real);
+        
+        vehicle_fmu.GetVariable("wheel_FL.ang_vel.y", omega_FL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_FR.ang_vel.y", omega_FR, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RL.ang_vel.y", omega_RL, FmuVariable::Type::Real);
+        vehicle_fmu.GetVariable("wheel_RR.ang_vel.y", omega_RR, FmuVariable::Type::Real);
+
+        // 7. Write trajectory, suspension velocities, tire forces, torques, wheel speeds, slips, travel, and driver controls to CSV
         csv << time << ref_frame.GetPos() << ref_frame.GetRot().GetCardanAnglesXYZ()
             << susp_vel_FL << susp_vel_FR << susp_vel_RL << susp_vel_RR
             << tire_f_FL_x << tire_f_FL_y << tire_f_FL_z
             << tire_f_FR_x << tire_f_FR_y << tire_f_FR_z
             << tire_f_RL_x << tire_f_RL_y << tire_f_RL_z
-            << tire_f_RR_x << tire_f_RR_y << tire_f_RR_z << std::endl;
+            << tire_f_RR_x << tire_f_RR_y << tire_f_RR_z
+            << torque << torque << torque << torque
+            << omega_FL << omega_FR << omega_RL << omega_RR
+            << slip_ang_FL << slip_ang_FR << slip_ang_RL << slip_ang_RR
+            << slip_rat_FL << slip_rat_FR << slip_rat_RL << slip_rat_RR
+            << susp_trav_FL << susp_trav_FR << susp_trav_RL << susp_trav_RR
+            << steering << throttle << braking << std::endl;
 
         time += step_size;
     }
@@ -550,9 +680,18 @@ int main(int argc, char* argv[]) {
 
     csv.WriteToFile(out_file);
     std::cout << "Trajectory written to: " << out_file << std::endl;
+    }
 
-    std::filesystem::remove_all(vehicle_unpack_dir);
-    std::filesystem::remove_all(driver_unpack_dir);
+    try {
+        std::filesystem::remove_all(vehicle_unpack_dir);
+    } catch (const std::exception& e) {
+        std::cout << "Note: Temporary vehicle unpack directory not removed: " << e.what() << std::endl;
+    }
+    try {
+        std::filesystem::remove_all(driver_unpack_dir);
+    } catch (const std::exception& e) {
+        std::cout << "Note: Temporary driver unpack directory not removed: " << e.what() << std::endl;
+    }
 
     return 0;
 }

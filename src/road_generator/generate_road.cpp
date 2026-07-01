@@ -164,13 +164,19 @@ int main(int argc, char* argv[]) {
             // 4. Format Nv elevations using AVX2-accelerated math
             for (int j = 0; j < Nv; ++j) {
                 double v = v_grid[j];
-                double x = xr - v * cos_bank * sin_phi;
-                double y = yr + v * cos_bank * cos_phi;
+                // Flat projection coordinates for evaluating roughness waves (matches OpenCRG C-API projection)
+                double x_crg = xr - v * sin_phi;
+                double y_crg = yr + v * cos_phi;
+                
+                // Physical projection coordinates for the 3D OBJ mesh (retains width scaling under banking)
+                double x_mesh = xr - v * cos_bank * sin_phi;
+                double y_mesh = yr + v * cos_bank * cos_phi;
+                
                 double z_bank = v * sin_bank;
                 
                 __m256 sum_vec = _mm256_setzero_ps();
-                __m256 x_vec = _mm256_set1_ps((float)x);
-                __m256 y_vec = _mm256_set1_ps((float)y);
+                __m256 x_vec = _mm256_set1_ps((float)x_crg);
+                __m256 y_vec = _mm256_set1_ps((float)y_crg);
                 
                 for (int w = 0; w < N_waves_padded; w += 8) {
                     __m256 kx_v = _mm256_loadu_ps(&kx_pad[w]);
@@ -194,11 +200,11 @@ int main(int argc, char* argv[]) {
                 
                 float final_z = (float)(z_ref[i] + z_bank + total_z);
                 
-                grid_x[i * Nv + j] = (float)x;
-                grid_y[i * Nv + j] = (float)y;
+                grid_x[i * Nv + j] = (float)x_mesh;
+                grid_y[i * Nv + j] = (float)y_mesh;
                 grid_z[i * Nv + j] = final_z;
                 
-                sprintf(val_buf, "%10.7f", (double)final_z);
+                sprintf(val_buf, "%10.7f", (double)total_z);
                 local_buffer.append(val_buf);
                 
                 col_in_line++;
@@ -270,16 +276,29 @@ int main(int argc, char* argv[]) {
                 setvbuf(f_obj, buffer.data(), _IOFBF, buffer.size());
                 
                 fprintf(f_obj, "# Road Surface OBJ Mesh\n");
+                // Write vertices
                 for (int idx = 0; idx < Nu * Nv; ++idx) {
                     fprintf(f_obj, "v %.4f %.4f %.4f\n", grid_x[idx], grid_y[idx], grid_z[idx]);
                 }
+                // Write texture coordinates (UVs)
+                double road_length = u_length;
+                double road_width = v_left - v_right;
+                double v_repeats = 0.5 * road_length / (road_width > 0.0 ? road_width : 8.0);
+                for (int i = 0; i < Nu; ++i) {
+                    for (int j = 0; j < Nv; ++j) {
+                        double u_coord = (double)j / (Nv - 1);
+                        double v_coord = ((double)i / (Nu - 1)) * v_repeats;
+                        fprintf(f_obj, "vt %.4f %.4f\n", u_coord, v_coord);
+                    }
+                }
+                // Write faces linking vertices and texture coordinates
                 for (int i = 0; i < Nu - 1; ++i) {
                     for (int j = 0; j < Nv - 1; ++j) {
                         int v1 = i * Nv + j + 1;
                         int v2 = i * Nv + (j + 1) + 1;
                         int v3 = (i + 1) * Nv + (j + 1) + 1;
                         int v4 = (i + 1) * Nv + j + 1;
-                        fprintf(f_obj, "f %d %d %d %d\n", v1, v2, v3, v4);
+                        fprintf(f_obj, "f %d/%d %d/%d %d/%d %d/%d\n", v1, v1, v4, v4, v3, v3, v2, v2);
                     }
                 }
                 fclose(f_obj);

@@ -43,11 +43,41 @@
 
 #ifdef CHRONO_HAS_OPENCRG
 #include "chrono_vehicle/terrain/CRGTerrain.h"
+#include "chrono/assets/ChVisualShapeLine.h"
+#include "chrono/geometry/ChLineBezier.h"
+#include "chrono/assets/ChVisualMaterial.h"
 #endif
 
 using namespace chrono;
 using namespace chrono::vehicle;
 using namespace chrono::fmi2;
+
+#ifdef CHRONO_IRRLICHT
+#include <irrlicht.h>
+#include "chrono_irrlicht/ChIrrTools.h"
+
+class FmuComponent::FMUVisualEventReceiver : public irr::IEventReceiver {
+public:
+    enum class DisplayMode {
+        TIRE_FORCES = 0,
+        TIRE_SLIPS = 1,
+        WHEEL_SPEEDS_TORQUES = 2,
+        ALL = 3,
+        NONE = 4
+    };
+    DisplayMode mode = DisplayMode::TIRE_FORCES;
+
+    virtual bool OnEvent(const irr::SEvent& event) override {
+        if (event.EventType == irr::EET_KEY_INPUT_EVENT && !event.KeyInput.PressedDown) {
+            if (event.KeyInput.Key == irr::KEY_KEY_I) { // Press 'I' to cycle info modes
+                mode = static_cast<DisplayMode>((static_cast<int>(mode) + 1) % 5);
+                return true;
+            }
+        }
+        return false;
+    }
+};
+#endif
 
 class VehicleFrictionFunctor : public ChTerrain::FrictionFunctor {
   public:
@@ -160,6 +190,9 @@ FmuComponent::FmuComponent(fmi2String instanceName,
     terrain_mesh_file = "";
     terrain_crg_file = "default_road.crg";
     terrain_crg_simplify = true;
+    terrain_diffuse_texture = "";
+    terrain_normal_texture = "";
+    terrain_show_visual_lines = false;
     terrain_friction = 0.8;
 
     friction_FL = 0.8;
@@ -195,6 +228,12 @@ FmuComponent::FmuComponent(fmi2String instanceName,
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
 
     AddFmuVariable(&terrain_crg_simplify, "terrain_crg_simplify", FmuVariable::Type::Boolean, "1", "simplify OpenCRG visualization mesh", //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
+    AddFmuVariable(&terrain_diffuse_texture, "terrain_diffuse_texture", FmuVariable::Type::String, "1", "diffuse texture file for CRG terrain", //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
+    AddFmuVariable(&terrain_normal_texture, "terrain_normal_texture", FmuVariable::Type::String, "1", "normal texture file for CRG terrain", //
+                   FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
+    AddFmuVariable(&terrain_show_visual_lines, "terrain_show_visual_lines", FmuVariable::Type::Boolean, "1", "show lane lines on CRG terrain", //
                    FmuVariable::CausalityType::parameter, FmuVariable::VariabilityType::fixed);                            //
 
     AddFmuVariable(&terrain_friction, "terrain_friction", FmuVariable::Type::Real, "1", "terrain friction",  //
@@ -430,7 +469,18 @@ void FmuComponent::CreateVehicle() {
             matNSC->SetFriction(static_cast<float>(terrain_friction));
             material = matNSC;
         }
-        rigid_terrain->AddPatch(material, ChCoordsys<>(), resolved_mesh_file, true, 0.0, true);
+        auto patch = rigid_terrain->AddPatch(material, ChCoordsys<>(), resolved_mesh_file, false, 0.0, true);
+        if (!terrain_diffuse_texture.empty()) {
+            std::filesystem::path tex_path(terrain_diffuse_texture);
+            std::string resolved_tex = terrain_diffuse_texture;
+            if (tex_path.is_relative()) {
+                resolved_tex = (std::filesystem::path(data_path) / tex_path).generic_string();
+            } else {
+                resolved_tex = tex_path.generic_string();
+            }
+            patch->SetTexture(resolved_tex, 1.0f, 1.0f);
+            std::cout << "[FMU] Applied diffuse texture to RigidTerrain patch: " << resolved_tex << std::endl;
+        }
         rigid_terrain->Initialize();
         terrain = rigid_terrain;
         std::cout << "Configured RigidTerrain mesh: " << resolved_mesh_file << std::endl;
@@ -447,8 +497,78 @@ void FmuComponent::CreateVehicle() {
         auto crg_terrain = chrono_types::make_shared<CRGTerrain>(vehicle->GetSystem());
         crg_terrain->SetContactFrictionCoefficient(static_cast<float>(terrain_friction));
         crg_terrain->SimplifyMesh(terrain_crg_simplify);
+        
+        // Resolve and load textures if configured (passing relative filenames directly to avoid double prepending)
+        if (!terrain_diffuse_texture.empty()) {
+            std::filesystem::path tex_path(terrain_diffuse_texture);
+            std::string tex_to_set = tex_path.is_relative() ? terrain_diffuse_texture : tex_path.filename().string();
+            crg_terrain->SetRoadDiffuseTextureFile(tex_to_set);
+            std::cout << "[FMU] Applied diffuse road texture: " << tex_to_set << std::endl;
+        }
+        if (!terrain_normal_texture.empty()) {
+            std::filesystem::path tex_path(terrain_normal_texture);
+            std::string tex_to_set = tex_path.is_relative() ? terrain_normal_texture : tex_path.filename().string();
+            crg_terrain->SetRoadNormalTextureFile(tex_to_set);
+            std::cout << "[FMU] Applied normal road texture: " << tex_to_set << std::endl;
+        }
+        
         crg_terrain->Initialize(resolved_crg_file);
         terrain = crg_terrain;
+        
+        // Draw visual centerline and boundary curves to represent road lanes
+        if (terrain_show_visual_lines) {
+            auto ground = crg_terrain->GetGround();
+            if (ground) {
+                auto center_mat = chrono_types::make_shared<ChVisualMaterial>();
+                center_mat->SetDiffuseColor({1.0f, 1.0f, 1.0f}); // White
+                
+                auto side_mat = chrono_types::make_shared<ChVisualMaterial>();
+                side_mat->SetDiffuseColor({0.8f, 0.8f, 0.0f}); // Yellow
+                
+                auto center_curve = crg_terrain->GetRoadCenterLine();
+                auto left_curve = crg_terrain->GetRoadBoundaryLeft();
+                auto right_curve = crg_terrain->GetRoadBoundaryRight();
+                
+                if (center_curve && left_curve && right_curve) {
+                    std::vector<ChVector3d> pts_center = center_curve->GetPoints();
+                    std::vector<ChVector3d> pts_left = left_curve->GetPoints();
+                    std::vector<ChVector3d> pts_right = right_curve->GetPoints();
+                    
+                    size_t np = pts_center.size();
+                    if (pts_left.size() == np && pts_right.size() == np) {
+                        for (size_t i = 0; i < np; i++) {
+                            // Offset Z slightly to avoid z-fighting with the road surface
+                            pts_center[i].z() += 0.015;
+                            pts_left[i].z() += 0.015;
+                            pts_right[i].z() += 0.015;
+                        }
+                        
+                        // Helper to create and add a visual line shape to the ground
+                        auto add_visual_line = [&](const std::vector<ChVector3d>& pts, std::shared_ptr<ChVisualMaterial> mat) {
+                            auto curve = chrono_types::make_shared<ChBezierCurve>(pts);
+                            auto line = chrono_types::make_shared<ChLineBezier>(curve);
+                            auto shape = chrono_types::make_shared<ChVisualShapeLine>();
+                            shape->SetLineGeometry(line);
+                            shape->SetNumRenderPoints(std::max<unsigned int>(static_cast<unsigned int>(3 * pts.size()), 400));
+                            shape->AddMaterial(mat);
+                            ground->AddVisualShape(shape);
+                        };
+                        
+                        // 1. Road Centerline (White - Center of the Middle Lane)
+                        add_visual_line(pts_center, center_mat);
+                        
+                        // 2. Left Road Boundary (Yellow)
+                        add_visual_line(pts_left, side_mat);
+                        
+                        // 3. Right Road Boundary (Yellow)
+                        add_visual_line(pts_right, side_mat);
+                        
+                        std::cout << "[FMU] Visual lane lines configured (white centerline, yellow boundaries)." << std::endl;
+                    }
+                }
+            }
+        }
+        
         std::cout << "Configured CRGTerrain file: " << resolved_crg_file << std::endl;
         std::cout << "  Road length:    " << crg_terrain->GetLength() << " m" << std::endl;
         std::cout << "  Road width:     " << crg_terrain->GetWidth() << " m" << std::endl;
@@ -463,7 +583,7 @@ void FmuComponent::CreateVehicle() {
     }
 
     // Register custom wheel-specific friction functor
-    auto friction_functor = chrono_types::make_shared<VehicleFrictionFunctor>(this);
+    friction_functor = chrono_types::make_shared<VehicleFrictionFunctor>(this);
     terrain->RegisterFrictionFunctor(friction_functor);
 
     // Create and initialize the tires
@@ -602,14 +722,20 @@ void FmuComponent::CalculateVehicleOutputs() {
     for (int iw = 0; iw < 4; iw++) {
         if (wheel_data[iw].wheel) {
             wheel_data[iw].state = wheel_data[iw].wheel->GetState();
+            // Transform wheel linear and angular velocities to vehicle chassis local frame for easy Simulink analysis
+            if (vehicle && vehicle->GetChassisBody()) {
+                wheel_data[iw].state.lin_vel = vehicle->GetChassisBody()->TransformDirectionParentToLocal(wheel_data[iw].state.lin_vel);
+                wheel_data[iw].state.ang_vel = vehicle->GetChassisBody()->TransformDirectionParentToLocal(wheel_data[iw].state.ang_vel);
+            }
         }
     }
 
     // Extract tire forces, slips, and suspension travel/velocity for study KPIs
-    if (vehicle && tires[0] && tires[1] && tires[2] && tires[3]) {
+    if (vehicle && tires[0] && tires[1] && tires[2] && tires[3] && vehicle->GetChassisBody()) {
         for (int iw = 0; iw < 4; iw++) {
-            // Tire contact force (reported in global frame)
-            tire_force[iw] = tires[iw]->ReportTireForce(terrain.get()).force;
+            // Tire contact force (transformed from global to vehicle chassis local frame)
+            chrono::ChVector3d force_global = tires[iw]->ReportTireForce(terrain.get()).force;
+            tire_force[iw] = vehicle->GetChassisBody()->TransformDirectionParentToLocal(force_global);
 
             // Tire slips
             tire_slip_angle[iw] = tires[iw]->GetSlipAngle();
@@ -710,6 +836,10 @@ fmi2Status FmuComponent::exitInitializationModeIMPL() {
         vis_sys->AddLightDirectional();
         vis_sys->AttachVehicle(vehicle.get());
         vis_sys->AttachTerrain(terrain.get());
+
+        // Create and register custom visual event receiver
+        visual_receiver = std::make_shared<FMUVisualEventReceiver>();
+        vis_sys->AddUserEventReceiver(visual_receiver.get());
     }
 #endif
     return fmi2Status::fmi2OK;
@@ -745,6 +875,9 @@ fmi2Status FmuComponent::doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real
             if (m_time >= last_render_time + 1.0 / fps) {
                 vis_sys->BeginScene(true, true);
                 vis_sys->Render();
+
+                DrawCustomTelemetry();
+
                 vis_sys->RenderFrame(ref_frame);
                 vis_sys->EndScene();
 
@@ -766,3 +899,125 @@ fmi2Status FmuComponent::doStepIMPL(fmi2Real currentCommunicationPoint, fmi2Real
 
     return fmi2Status::fmi2OK;
 }
+
+#ifdef CHRONO_IRRLICHT
+void FmuComponent::DrawCustomTelemetry() {
+    if (!vis_sys || !visual_receiver) return;
+
+    auto mode = visual_receiver->mode;
+    if (mode == FMUVisualEventReceiver::DisplayMode::NONE) return;
+
+    // Force outputs update before drawing to ensure HUD data is fresh
+    CalculateVehicleOutputs();
+
+    // 1. Draw 3D tire forces (normal force in Blue, lateral/longitudinal in Red)
+    if (mode == FMUVisualEventReceiver::DisplayMode::TIRE_FORCES || mode == FMUVisualEventReceiver::DisplayMode::ALL) {
+        for (int i = 0; i < 4; i++) {
+            if (wheel_data[i].wheel) {
+                auto spindle_pos = wheel_data[i].wheel->GetSpindle()->GetPos();
+                
+                // Chassis local axes in world coordinates (non-spinning, follows chassis plane)
+                auto chassis_rot = vehicle->GetChassisBody()->GetRot();
+                ChVector3d c_fwd = chassis_rot.Rotate(ChVector3d(1, 0, 0)); // chassis forward
+                ChVector3d c_lat = chassis_rot.Rotate(ChVector3d(0, 1, 0)); // chassis lateral
+                ChVector3d c_up  = chassis_rot.Rotate(ChVector3d(0, 0, 1)); // chassis vertical
+
+                // Retrieve pre-calculated local forces in the chassis plane
+                double Fx = tire_force[i].x();
+                double Fy = tire_force[i].y();
+                double Fz = tire_force[i].z();
+                
+                // Normal force vector points along chassis vertical axis (Blue)
+                ChVector3d norm_end = spindle_pos + c_up * (Fz * 0.0002);
+                chrono::irrlicht::tools::drawArrow(
+                    vis_sys.get(),
+                    spindle_pos,
+                    norm_end,
+                    c_lat,
+                    false,
+                    chrono::ChColor(0.f, 0.4f, 1.f),
+                    false
+                );
+                
+                // In-plane contact force vector points along chassis local horizontal plane (Red)
+                ChVector3d plane_force_vec = c_fwd * Fx + c_lat * Fy;
+                ChVector3d plane_end = spindle_pos + plane_force_vec * 0.0002;
+                chrono::irrlicht::tools::drawArrow(
+                    vis_sys.get(),
+                    spindle_pos,
+                    plane_end,
+                    c_up,
+                    false,
+                    chrono::ChColor(1.f, 0.f, 0.f),
+                    false
+                );
+            }
+        }
+    }
+
+    // 2. Draw 2D HUD text overlay
+    irr::gui::IGUIFont* font = vis_sys->GetMonospaceFont();
+    if (!font) return;
+
+    auto screen_size = vis_sys->GetVideoDriver()->getScreenSize();
+    int left = 15;
+    int top = screen_size.Height - 165;
+    int width = 350;
+    int height = 145;
+
+    // Draw background panel
+    vis_sys->GetVideoDriver()->draw2DRectangle(
+        irr::video::SColor(180, 20, 20, 25),
+        irr::core::rect<irr::s32>(left, top, left + width, top + height)
+    );
+
+    // Draw Mode title
+    std::string mode_str = "";
+    if (mode == FMUVisualEventReceiver::DisplayMode::TIRE_FORCES) mode_str = "Mode: Tire Forces (Press 'I' to toggle)";
+    else if (mode == FMUVisualEventReceiver::DisplayMode::TIRE_SLIPS) mode_str = "Mode: Tire Slips (Press 'I' to toggle)";
+    else if (mode == FMUVisualEventReceiver::DisplayMode::WHEEL_SPEEDS_TORQUES) mode_str = "Mode: Wheel Speeds & Torques (Press 'I' to toggle)";
+    else if (mode == FMUVisualEventReceiver::DisplayMode::ALL) mode_str = "Mode: All Telemetry (Press 'I' to toggle)";
+    
+    font->draw(mode_str.c_str(), irr::core::rect<irr::s32>(left + 10, top + 8, left + width - 10, top + 25), irr::video::SColor(255, 255, 255, 255));
+
+    char buf[128];
+    int line_y = top + 30;
+    const std::array<std::string, 4> wheel_names = {"FL", "FR", "RL", "RR"};
+
+    if (mode == FMUVisualEventReceiver::DisplayMode::TIRE_FORCES || mode == FMUVisualEventReceiver::DisplayMode::ALL) {
+        for (int i = 0; i < 4; i++) {
+            auto f = tire_force[i]; // already resolved in vehicle chassis local frame
+            snprintf(buf, sizeof(buf), "%s Force: Fx=%+5.0f N, Fy=%+5.0f N, Fz=%+5.0f N", wheel_names[i].c_str(), f.x(), f.y(), f.z());
+            font->draw(buf, irr::core::rect<irr::s32>(left + 10, line_y, left + width - 10, line_y + 18), irr::video::SColor(255, 250, 150, 50));
+            line_y += 16;
+        }
+    }
+    if (mode == FMUVisualEventReceiver::DisplayMode::TIRE_SLIPS) {
+        for (int i = 0; i < 4; i++) {
+            double slip_angle_deg = tire_slip_angle[i] * 180.0 / CH_PI;
+            double slip_ratio_pct = tire_slip_ratio[i] * 100.0;
+            snprintf(buf, sizeof(buf), "%s Slip: Angle=%+6.2f deg, Ratio=%+6.1f %%", wheel_names[i].c_str(), slip_angle_deg, slip_ratio_pct);
+            font->draw(buf, irr::core::rect<irr::s32>(left + 10, line_y, left + width - 10, line_y + 18), irr::video::SColor(255, 50, 200, 250));
+            line_y += 16;
+        }
+    }
+    if (mode == FMUVisualEventReceiver::DisplayMode::WHEEL_SPEEDS_TORQUES) {
+        std::array<double, 4> torques = {torque_FL, torque_FR, torque_RL, torque_RR};
+        for (int i = 0; i < 4; i++) {
+            double spin_speed = wheel_data[i].wheel ? wheel_data[i].state.omega : 0.0;
+            snprintf(buf, sizeof(buf), "%s Wheel: Spin=%+6.1f rad/s, Torque=%+6.1f Nm", wheel_names[i].c_str(), spin_speed, torques[i]);
+            font->draw(buf, irr::core::rect<irr::s32>(left + 10, line_y, left + width - 10, line_y + 18), irr::video::SColor(255, 100, 250, 100));
+            line_y += 16;
+        }
+    }
+    if (mode == FMUVisualEventReceiver::DisplayMode::ALL) {
+        std::array<double, 4> torques = {torque_FL, torque_FR, torque_RL, torque_RR};
+        snprintf(buf, sizeof(buf), "Torques: FL=%+.0f FR=%+.0f RL=%+.0f RR=%+.0f", torques[0], torques[1], torques[2], torques[3]);
+        font->draw(buf, irr::core::rect<irr::s32>(left + 10, line_y, left + width - 10, line_y + 18), irr::video::SColor(255, 255, 255, 255));
+        line_y += 16;
+        
+        snprintf(buf, sizeof(buf), "Slips %%: FL=%+5.1f FR=%+5.1f RL=%+5.1f RR=%+5.1f", tire_slip_ratio[0]*100, tire_slip_ratio[1]*100, tire_slip_ratio[2]*100, tire_slip_ratio[3]*100);
+        font->draw(buf, irr::core::rect<irr::s32>(left + 10, line_y, left + width - 10, line_y + 18), irr::video::SColor(255, 255, 255, 255));
+    }
+}
+#endif

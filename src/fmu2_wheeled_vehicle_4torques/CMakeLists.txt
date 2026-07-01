@@ -42,6 +42,13 @@ add_custom_target(stage_fmu_resources ALL
     # Copy build-time generated road terrain files from the build/generated/ directory
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/generated/default_road.crg" "${COMPONENT_RESOURCES_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/generated/default_road.obj" "${COMPONENT_RESOURCES_DIR}/"
+    # Copy standard textures from Chrono data for self-contained FMU packaging
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_DATA_DIR}/textures/road.jpg" "${COMPONENT_RESOURCES_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_DATA_DIR}/textures/concrete.jpg" "${COMPONENT_RESOURCES_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_DATA_DIR}/textures/rock.jpg" "${COMPONENT_RESOURCES_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_VEHICLE_DATA_DIR}/terrain/textures/dirt.jpg" "${COMPONENT_RESOURCES_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_VEHICLE_DATA_DIR}/terrain/textures/Concrete002_2K-JPG/Concrete002_2K_Color.jpg" "${COMPONENT_RESOURCES_DIR}/concrete_color.jpg"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CHRONO_VEHICLE_DATA_DIR}/terrain/textures/Concrete002_2K-JPG/Concrete002_2K_NormalDX.jpg" "${COMPONENT_RESOURCES_DIR}/concrete_normal.jpg"
     # Copy fonts from Chrono data
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CHRONO_DATA_DIR}/fonts" "${COMPONENT_RESOURCES_DIR}/fonts"
     # Copy colormaps from Chrono data

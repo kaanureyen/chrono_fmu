@@ -97,6 +97,10 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     /// This function is called after advancing dynamics of the vehicle.
     void CalculateVehicleOutputs();
 
+#ifdef CHRONO_IRRLICHT
+    void DrawCustomTelemetry();
+#endif
+
     /// Functor class to set terrain friction coefficient.
     std::shared_ptr<VehicleFrictionFunctor> friction_functor;
 
@@ -117,6 +121,8 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
 
 #ifdef CHRONO_IRRLICHT
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> vis_sys;
+    class FMUVisualEventReceiver;
+    std::shared_ptr<FMUVisualEventReceiver> visual_receiver;
 #endif
 
     // FMU I/O parameters
@@ -137,6 +143,9 @@ class FmuComponent : public chrono::fmi2::FmuChronoComponentBase {
     std::string terrain_mesh_file;             ///< OBJ road surface mesh file (for terrain_type = 1)
     std::string terrain_crg_file;              ///< OpenCRG road file (.crg) (for terrain_type = 2)
     fmi2Boolean terrain_crg_simplify;          ///< simplify OpenCRG visualization mesh
+    std::string terrain_diffuse_texture;       ///< diffuse texture file for CRG terrain
+    std::string terrain_normal_texture;        ///< normal texture file for CRG terrain
+    fmi2Boolean terrain_show_visual_lines;     ///< show center and boundary lines on CRG terrain
     double terrain_friction;                   ///< terrain coefficient of friction
     fmi2Boolean system_SMC;                    ///< use SMC contact formulation (NSC otherwise)
     chrono::ChVector3d init_loc;               ///< initial vehicle location

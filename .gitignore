@@ -21,4 +21,6 @@ DEMO_OUTPUT/
 *.pdb
 temp_input.txt
 default_lane_change_path.txt
-
+__pycache__/
+*.zip
+*.pyc

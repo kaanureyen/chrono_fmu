@@ -65,7 +65,42 @@ def get_station_at_time(t, v_init, v_target, t_speed_start, t_speed_dur, start_l
         
     return d + start_length_margin
 
+def eval_pose_pos(time, params):
+    params_base = params.copy()
+    params_base["superpose_lc"] = False
+    x_base, y_base, phi_base = get_base_trajectory_pose(time, params_base)
+    
+    t_start = params.get("lc_start_time", 2.0)
+    t_dur = params.get("lc_duration", 5.0)
+    width = params.get("lc_width", 5.0)
+    
+    if time < t_start:
+        d_lc = 0.0
+    elif time > t_start + t_dur:
+        d_lc = width
+    else:
+        tau = (time - t_start) / t_dur
+        d_lc = width * S_poly(tau)
+        
+    x = x_base - d_lc * np.sin(phi_base)
+    y = y_base + d_lc * np.cos(phi_base)
+    return x, y
+
 def get_trajectory_pose(t, params):
+    if params.get("superpose_lc", False):
+        eps = 0.001
+        x_m, y_m = eval_pose_pos(t - eps, params)
+        x_c, y_c = eval_pose_pos(t, params)
+        x_p, y_p = eval_pose_pos(t + eps, params)
+        
+        dx = (x_p - x_m) / (2.0 * eps)
+        dy = (y_p - y_m) / (2.0 * eps)
+        phi = np.arctan2(dy, dx)
+        return x_c, y_c, phi
+    else:
+        return get_base_trajectory_pose(t, params)
+
+def get_base_trajectory_pose(t, params):
     v_init = params["v_init"]
     v_target = params["v_target"]
     t_speed_start = params["t_speed_start"]
@@ -472,6 +507,17 @@ def generate_road_profile(
     clothoid_a=0.0005,
     vehicle_width=2.0,
     
+    # New visual, packaging, and filtering parameters
+    curvature_filter_window_m=15.0,
+    superpose_lc=False,
+    lc_start_time=2.0,
+    lc_duration=5.0,
+    lc_width=5.0,
+    terrain_diffuse_texture="",
+    terrain_normal_texture="",
+    terrain_show_visual_lines=False,
+    terrain_crg_simplify=True,
+    
     # Slope & Banking parameters
     slope_type="None",
     slope_value=0.0,
@@ -580,7 +626,11 @@ def generate_road_profile(
         "vehicle_width": vehicle_width,
         "s_clothoid": s_clothoid,
         "x_clothoid": x_clothoid,
-        "y_clothoid": y_clothoid
+        "y_clothoid": y_clothoid,
+        "superpose_lc": superpose_lc,
+        "lc_start_time": lc_start_time,
+        "lc_duration": lc_duration,
+        "lc_width": lc_width
     }
 
     t_end_crg = t_end + end_length_margin / v_target
@@ -629,43 +679,48 @@ def generate_road_profile(
     slope_grid = np.zeros(Nu)
     banking_grid = np.zeros(Nu)
     
+    # Pre-calculate local curvature profile (finite differences w.r.t time)
+    kappa_grid = np.zeros(Nu)
+    for i in range(Nu):
+        t_curr = t_grid[i]
+        dt_curv = 0.01
+        x_m, y_m, _ = get_trajectory_pose(t_curr - dt_curv, params)
+        x_c, y_c, _ = get_trajectory_pose(t_curr, params)
+        x_p, y_p, _ = get_trajectory_pose(t_curr + dt_curv, params)
+        
+        dx_c = (x_p - x_m) / (2.0 * dt_curv)
+        dy_c = (y_p - y_m) / (2.0 * dt_curv)
+        ddx_c = (x_p - 2.0 * x_c + x_m) / (dt_curv**2)
+        ddy_c = (y_p - 2.0 * y_c + y_m) / (dt_curv**2)
+        
+        denom = (dx_c**2 + dy_c**2)**1.5
+        if denom < 1e-6:
+            kappa_grid[i] = 0.0
+        else:
+            kappa_grid[i] = (dx_c * ddy_c - dy_c * ddx_c) / denom
+
+    # Apply Curvature Filtering (Moving Average Filter) if window size > 0
+    if curvature_filter_window_m > 0.0:
+        window_size = int(round(curvature_filter_window_m / du))
+        if window_size > 1:
+            window = np.ones(window_size) / window_size
+            padded_kappa = np.pad(kappa_grid, (window_size//2, window_size - 1 - window_size//2), mode='edge')
+            kappa_grid = np.convolve(padded_kappa, window, mode='valid')
+            
     for i, u in enumerate(u_grid):
         slope_grid[i] = evaluate_profile(u, slope_type, slope_value, slope_start, slope_duration)
         
-        # Link Banking to Local Curvature dynamically if selected
         if banking_type == "Link to Curvature":
-            t_curr = t_grid[i]
-            # Finite differences w.r.t time to compute curvature
-            dt_curv = 0.01
-            x_m, y_m, _ = get_trajectory_pose(t_curr - dt_curv, params)
-            x_c, y_c, _ = get_trajectory_pose(t_curr, params)
-            x_p, y_p, _ = get_trajectory_pose(t_curr + dt_curv, params)
-            
-            dx_c = (x_p - x_m) / (2.0 * dt_curv)
-            dy_c = (y_p - y_m) / (2.0 * dt_curv)
-            ddx_c = (x_p - 2.0 * x_c + x_m) / (dt_curv**2)
-            ddy_c = (y_p - 2.0 * y_c + y_m) / (dt_curv**2)
-            
-            denom = (dx_c**2 + dy_c**2)**1.5
-            if denom < 1e-6:
-                kappa = 0.0
-            else:
-                kappa = (dx_c * ddy_c - dy_c * ddx_c) / denom
-            
             scale = radius if maneuver_type in ["Circular Path", "J-Turn", "U-Turn", "Braking in a Turn", "Fishhook"] else 50.0
-            banking_grid[i] = -banking_value * kappa * scale
-        elif banking_type == "Constant":
-            # Smooth transition over 20m centered at turn start to prevent vehicle drop at spawn
-            s_turn_start = start_length_margin + lead_in_length
-            if u < s_turn_start - 10.0:
-                banking_grid[i] = 0.0
-            elif u > s_turn_start + 10.0:
-                banking_grid[i] = banking_value
-            else:
-                tau = (u - (s_turn_start - 10.0)) / 20.0
-                banking_grid[i] = banking_value * evaluate_profile(u, "Smooth Step", 1.0, s_turn_start - 10.0, 20.0)
+            banking_grid[i] = -banking_value * kappa_grid[i] * scale
+        elif banking_type == "Balance Lateral Acceleration":
+            v_curr = get_speed_at_time(t_grid[i], v_init, v_target, t_speed_start, t_speed_dur)
+            # theta_bank = - v^2 * kappa / g
+            raw_bank = - (v_curr**2 * kappa_grid[i]) / 9.80665
+            # Cap the banking cross slope to the user-specified banking_value (superelevation limit)
+            banking_grid[i] = np.clip(raw_bank, -abs(banking_value), abs(banking_value))
         else:
-            banking_grid[i] = evaluate_profile(u, banking_type, banking_value, banking_start, banking_duration)
+            banking_grid[i] = 0.0
 
     # 7. Roughness parameters (ISO 8608 Classes A to H)
     roughness_coefficients = {
@@ -784,12 +839,12 @@ def generate_road_profile(
         obj_file = os.path.join(output_dir, "default_road.obj")
         cmd.append(obj_file)
         
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    for line in process.stdout:
-        print(line, end="")
-    process.wait()
-    if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, cmd)
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
+        for line in process.stdout:
+            print(line, end="")
+        process.wait()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, cmd)
     if generate_obj:
         print(f"Generated road OBJ mesh at {obj_file}")
 
@@ -857,7 +912,13 @@ def generate_road_profile(
         f.write("% Cruise Controller Parameters\n")
         f.write(f"Kp_speed = {Kp_speed:.6f};\n")
         f.write(f"Ki_speed = {Ki_speed:.6f};\n")
-        f.write(f"Kd_speed = {Kd_speed:.6f};\n")
+        f.write(f"Kd_speed = {Kd_speed:.6f};\n\n")
+        
+        f.write("% Terrain Visualization and Packaging Parameters\n")
+        f.write(f"terrain_crg_simplify = {1 if terrain_crg_simplify else 0};\n")
+        f.write(f"terrain_diffuse_texture = '{terrain_diffuse_texture}';\n")
+        f.write(f"terrain_normal_texture = '{terrain_normal_texture}';\n")
+        f.write(f"terrain_show_visual_lines = {1 if terrain_show_visual_lines else 0};\n")
         
     print(f"Generated Matlab simulation parameters at {matlab_file}")
 
